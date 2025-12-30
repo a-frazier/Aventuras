@@ -111,27 +111,51 @@ export class OpenRouterProvider implements AIProvider {
   }
 
   async listModels(): Promise<ModelInfo[]> {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-    });
+    // The models endpoint is public and doesn't require authentication
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch models');
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OpenRouter models API error:', response.status, errorText);
+        throw new Error(`Failed to fetch models: ${response.status}`);
+      }
+
+      const json = await response.json();
+
+      if (!json.data || !Array.isArray(json.data)) {
+        console.error('Unexpected API response structure:', json);
+        throw new Error('Invalid API response structure');
+      }
+
+      return json.data.map((model: any) => ({
+        id: model.id,
+        name: model.name ?? model.id,
+        description: model.description ?? '',
+        contextLength: model.context_length ?? model.top_provider?.context_length ?? 4096,
+        pricing: model.pricing ? {
+          prompt: parseFloat(model.pricing.prompt) || 0,
+          completion: parseFloat(model.pricing.completion) || 0,
+        } : undefined,
+      }));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return data.data.map((model: any) => ({
-      id: model.id,
-      name: model.name ?? model.id,
-      description: model.description,
-      contextLength: model.context_length ?? 4096,
-      pricing: model.pricing ? {
-        prompt: parseFloat(model.pricing.prompt),
-        completion: parseFloat(model.pricing.completion),
-      } : undefined,
-    }));
   }
 
   async validateApiKey(): Promise<boolean> {

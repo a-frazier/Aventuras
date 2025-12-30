@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { ui } from '$lib/stores/ui.svelte';
   import { settings } from '$lib/stores/settings.svelte';
-  import { X, Key, Cpu, Palette } from 'lucide-svelte';
+  import { OpenRouterProvider } from '$lib/services/ai/openrouter';
+  import type { ModelInfo } from '$lib/services/ai/types';
+  import { X, Key, Cpu, Palette, RefreshCw, Search } from 'lucide-svelte';
 
   let activeTab = $state<'api' | 'generation' | 'ui'>('api');
 
@@ -9,9 +12,95 @@
   let apiKeyInput = $state('');
   let apiKeySet = $state(false);
 
+  // Model fetching state
+  let models = $state<ModelInfo[]>([]);
+  let isLoadingModels = $state(false);
+  let modelError = $state<string | null>(null);
+  let modelSearch = $state('');
+
+  // Fallback models if API fetch fails
+  const fallbackModels: ModelInfo[] = [
+    { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', contextLength: 200000 },
+    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', contextLength: 200000 },
+    { id: 'openai/gpt-4o', name: 'GPT-4o', contextLength: 128000 },
+    { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', contextLength: 128000 },
+    { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5', contextLength: 1000000 },
+    { id: 'meta-llama/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', contextLength: 131072 },
+    { id: 'mistralai/mistral-large', name: 'Mistral Large', contextLength: 128000 },
+  ];
+
+  // Filtered and sorted models
+  let filteredModels = $derived.by(() => {
+    let result = models.length > 0 ? [...models] : [...fallbackModels];
+
+    // Filter by search term
+    if (modelSearch.trim()) {
+      const search = modelSearch.toLowerCase();
+      result = result.filter(m =>
+        m.id.toLowerCase().includes(search) ||
+        m.name.toLowerCase().includes(search)
+      );
+    }
+
+    // Sort: prioritize popular providers, then alphabetically
+    const providerPriority: Record<string, number> = {
+      'anthropic': 1,
+      'openai': 2,
+      'google': 3,
+      'meta-llama': 4,
+      'mistralai': 5,
+    };
+
+    return result.sort((a, b) => {
+      const providerA = a.id.split('/')[0];
+      const providerB = b.id.split('/')[0];
+      const priorityA = providerPriority[providerA] ?? 99;
+      const priorityB = providerPriority[providerB] ?? 99;
+
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return a.name.localeCompare(b.name);
+    });
+  });
+
   $effect(() => {
     apiKeySet = !!settings.apiSettings.openrouterApiKey;
   });
+
+  // Fetch models on mount (public endpoint, no API key needed)
+  onMount(() => {
+    fetchModels();
+  });
+
+  async function fetchModels() {
+    if (isLoadingModels) return;
+
+    isLoadingModels = true;
+    modelError = null;
+
+    try {
+      // Models endpoint is public, doesn't need API key
+      const provider = new OpenRouterProvider('');
+      const fetchedModels = await provider.listModels();
+
+      // Filter to only include text/chat models (exclude image, embedding, etc.)
+      models = fetchedModels.filter(m => {
+        const id = m.id.toLowerCase();
+        // Exclude non-chat models
+        if (id.includes('embedding') || id.includes('vision-only') || id.includes('tts') || id.includes('whisper')) {
+          return false;
+        }
+        return true;
+      });
+
+      console.log(`Loaded ${models.length} models from OpenRouter`);
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
+      modelError = 'Failed to load models. Using defaults.';
+      models = [];
+    } finally {
+      isLoadingModels = false;
+    }
+  }
 
   async function saveApiKey() {
     if (apiKeyInput.trim()) {
@@ -20,20 +109,22 @@
     }
   }
 
+  function handleRefreshModels() {
+    models = [];
+    fetchModels();
+  }
+
   async function clearApiKey() {
     await settings.setApiKey('');
     apiKeySet = false;
+    models = [];
   }
 
-  const popularModels = [
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-    { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
-    { id: 'openai/gpt-4o', name: 'GPT-4o' },
-    { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo' },
-    { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
-    { id: 'meta-llama/llama-3.1-405b-instruct', name: 'Llama 3.1 405B' },
-    { id: 'mistralai/mistral-large', name: 'Mistral Large' },
-  ];
+  function formatContextLength(length: number): string {
+    if (length >= 1000000) return `${(length / 1000000).toFixed(1)}M`;
+    if (length >= 1000) return `${Math.round(length / 1000)}K`;
+    return length.toString();
+  }
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick={() => ui.closeSettings()}>
@@ -124,18 +215,60 @@
           </div>
 
           <div>
-            <label class="mb-2 block text-sm font-medium text-surface-300">
-              Default Model
-            </label>
+            <div class="mb-2 flex items-center justify-between">
+              <label class="text-sm font-medium text-surface-300">
+                Default Model
+              </label>
+              <button
+                class="flex items-center gap-1 text-xs text-accent-400 hover:text-accent-300 disabled:opacity-50"
+                onclick={handleRefreshModels}
+                disabled={isLoadingModels}
+              >
+                <span class={isLoadingModels ? 'animate-spin' : ''}>
+                  <RefreshCw class="h-3 w-3" />
+                </span>
+                Refresh
+              </button>
+            </div>
+
+            {#if modelError}
+              <p class="mb-2 text-xs text-amber-400">{modelError}</p>
+            {/if}
+
+            <!-- Search input -->
+            <div class="relative mb-2">
+              <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500" />
+              <input
+                type="text"
+                bind:value={modelSearch}
+                placeholder="Search models..."
+                class="input pl-9 text-sm"
+              />
+            </div>
+
+            <!-- Model select -->
             <select
               class="input"
               value={settings.apiSettings.defaultModel}
               onchange={(e) => settings.setDefaultModel(e.currentTarget.value)}
+              disabled={isLoadingModels}
             >
-              {#each popularModels as model}
-                <option value={model.id}>{model.name}</option>
-              {/each}
+              {#if isLoadingModels}
+                <option>Loading models...</option>
+              {:else}
+                {#each filteredModels as model}
+                  <option value={model.id}>
+                    {model.name} ({formatContextLength(model.contextLength)} ctx)
+                  </option>
+                {/each}
+              {/if}
             </select>
+
+            {#if models.length > 0}
+              <p class="mt-1 text-xs text-surface-500">
+                {models.length} models available
+              </p>
+            {/if}
           </div>
         </div>
       {:else if activeTab === 'generation'}
