@@ -1,6 +1,7 @@
 import type { Story, StoryEntry, Character, Location, Item, StoryBeat, Chapter, Checkpoint, MemoryConfig, StoryMode, StorySettings } from '$lib/types';
 import { database } from '$lib/services/database';
 import { BUILTIN_TEMPLATES } from '$lib/services/templates';
+import { ui } from './ui.svelte';
 import type { ClassificationResult } from '$lib/services/ai/classifier';
 import { DEFAULT_MEMORY_CONFIG } from '$lib/services/ai/memory';
 import {
@@ -136,6 +137,11 @@ class StoryStore {
       chapters: chapters.length,
       checkpoints: checkpoints.length,
     });
+
+    // Load persisted action choices for adventure mode
+    if (story.mode === 'adventure') {
+      await ui.loadActionChoices(storyId);
+    }
 
     // Emit event
     emitStoryLoaded(storyId, story.mode);

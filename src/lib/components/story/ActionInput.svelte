@@ -24,6 +24,7 @@
   let actionType = $state<'do' | 'say' | 'think' | 'story'>('do');
   let suggestions = $state<StorySuggestion[]>([]);
   let suggestionsLoading = $state(false);
+  let isRawActionChoice = $state(false); // True when submitting an AI-generated choice (no prefix/suffix)
 
   // In creative writing mode, show different input style
   const isCreativeMode = $derived(story.storyMode === 'creative-writing');
@@ -36,6 +37,22 @@
       log('Unregistering retry callback');
       ui.setRetryCallback(null);
     };
+  });
+
+  // Watch for pending action choice from ActionChoices component
+  $effect(() => {
+    const pendingAction = ui.pendingActionChoice;
+    if (pendingAction && !ui.isGenerating) {
+      log('Processing pending action choice:', pendingAction);
+      // Set input value and flag as raw (no prefix/suffix needed)
+      inputValue = pendingAction;
+      isRawActionChoice = true;
+      ui.clearPendingActionChoice();
+      // Use setTimeout to ensure the state update is processed
+      setTimeout(() => {
+        handleSubmit();
+      }, 0);
+    }
   });
 
   /**
@@ -75,6 +92,32 @@
     // Focus the input
     const input = document.querySelector('textarea');
     input?.focus();
+  }
+
+  /**
+   * Generate RPG-style action choices for adventure mode.
+   */
+  async function generateActionChoices(narrativeResponse: string, worldState: any) {
+    if (isCreativeMode || story.entries.length === 0) {
+      return;
+    }
+
+    ui.setActionChoicesLoading(true);
+    try {
+      const result = await aiService.generateActionChoices(
+        story.entries,
+        worldState,
+        narrativeResponse,
+        story.pov
+      );
+      ui.setActionChoices(result.choices, story.currentStory?.id);
+      log('Action choices generated:', result.choices.length);
+    } catch (error) {
+      log('Failed to generate action choices:', error);
+      ui.clearActionChoices();
+    } finally {
+      ui.setActionChoicesLoading(false);
+    }
   }
 
   /**
@@ -194,6 +237,7 @@
     ui.setGenerating(true);
     ui.startStreaming();
     ui.clearGenerationError(); // Clear any previous error
+    ui.clearActionChoices(); // Clear previous action choices
 
     try {
       // Build world state for AI context
@@ -241,6 +285,10 @@
       }
 
       log('Stream complete', { chunkCount, responseLength: fullResponse.length });
+
+      // End streaming immediately to prevent duplicate display
+      // (StreamingEntry would show alongside the saved entry otherwise)
+      ui.endStreaming();
 
       // Save the complete response as a story entry
       if (fullResponse.trim()) {
@@ -297,6 +345,13 @@
             log('Suggestions generation failed (non-fatal)', err);
           });
         }
+
+        // Phase 7: Generate RPG action choices for adventure mode (background, non-blocking)
+        if (!isCreativeMode) {
+          generateActionChoices(fullResponse, worldState).catch(err => {
+            log('Action choices generation failed (non-fatal)', err);
+          });
+        }
       } else {
         log('No response content to save (fullResponse was empty or whitespace)');
       }
@@ -331,12 +386,21 @@
     // Clear any previous error
     ui.clearGenerationError();
 
-    // In creative writing mode, use raw input as direction
-    // In adventure mode, apply action prefixes/suffixes
-    const content = isCreativeMode
-      ? inputValue.trim()
-      : actionPrefixes[actionType] + inputValue.trim() + actionSuffixes[actionType];
-    log('Action content built', { content, mode: isCreativeMode ? 'creative' : 'adventure' });
+    // Build action content:
+    // - Creative writing mode: use raw input as direction
+    // - Raw action choice (from ActionChoices): use as-is (already formatted by AI)
+    // - Adventure mode: apply action prefixes/suffixes
+    let content: string;
+    if (isCreativeMode || isRawActionChoice) {
+      content = inputValue.trim();
+    } else {
+      content = actionPrefixes[actionType] + inputValue.trim() + actionSuffixes[actionType];
+    }
+
+    // Reset the raw action choice flag
+    isRawActionChoice = false;
+
+    log('Action content built', { content, mode: isCreativeMode ? 'creative' : 'adventure', wasRawChoice: isRawActionChoice });
 
     // Add user action to story
     const userActionEntry = await story.addEntry('user_action', content);

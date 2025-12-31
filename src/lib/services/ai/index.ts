@@ -4,6 +4,7 @@ import { BUILTIN_TEMPLATES } from '$lib/services/templates';
 import { ClassifierService, type ClassificationResult, type ClassificationContext } from './classifier';
 import { MemoryService, type ChapterAnalysis, type ChapterSummary, type RetrievalDecision, DEFAULT_MEMORY_CONFIG } from './memory';
 import { SuggestionsService, type StorySuggestion, type SuggestionsResult } from './suggestions';
+import { ActionChoicesService, type ActionChoice, type ActionChoicesResult } from './actionChoices';
 import { ContextBuilder, type ContextResult, type ContextConfig, DEFAULT_CONTEXT_CONFIG } from './context';
 import type { Message, GenerationResponse, StreamChunk } from './types';
 import type { Story, StoryEntry, Character, Location, Item, StoryBeat, Chapter, MemoryConfig } from '$lib/types';
@@ -287,6 +288,27 @@ class AIService {
     const provider = this.getProvider();
     const suggestions = new SuggestionsService(provider);
     return await suggestions.generateSuggestions(entries, activeThreads, genre);
+  }
+
+  /**
+   * Generate RPG-style action choices for adventure mode.
+   * Displayed after narration to give the player clear options.
+   */
+  async generateActionChoices(
+    entries: StoryEntry[],
+    worldState: WorldState,
+    narrativeResponse: string,
+    pov?: 'first' | 'second' | 'third'
+  ): Promise<ActionChoicesResult> {
+    log('generateActionChoices called', {
+      entriesCount: entries.length,
+      narrativeLength: narrativeResponse.length,
+      pov,
+    });
+
+    const provider = this.getProvider();
+    const actionChoices = new ActionChoicesService(provider);
+    return await actionChoices.generateChoices(entries, worldState, narrativeResponse, pov);
   }
 
   /**

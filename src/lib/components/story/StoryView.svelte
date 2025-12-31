@@ -4,6 +4,7 @@
   import StoryEntry from './StoryEntry.svelte';
   import StreamingEntry from './StreamingEntry.svelte';
   import ActionInput from './ActionInput.svelte';
+  import ActionChoices from './ActionChoices.svelte';
 
   let storyContainer: HTMLDivElement;
 
@@ -41,6 +42,11 @@
         <!-- Show streaming entry while generating -->
         {#if ui.isStreaming}
           <StreamingEntry />
+        {/if}
+
+        <!-- Show RPG-style action choices after narration (adventure mode only) -->
+        {#if !ui.isStreaming && story.storyMode === 'adventure'}
+          <ActionChoices />
         {/if}
       {/if}
     </div>
