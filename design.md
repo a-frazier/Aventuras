@@ -179,6 +179,7 @@ type EventType =
 | **Classifier** | 3 | Yes | Structured analysis of response |
 | **Vision** | 4 & 5 | No | Queue + generate images |
 | **Suggestions** | 4 | No | Generate story direction options (creative mode) |
+| **Lore Management** | On-demand | Yes | Agentic lore review and maintenance |
 | **Persistence** | 4 | No | Autosave to disk |
 
 ---
@@ -216,9 +217,6 @@ interface Chapter {
   locations: string[];
   plotThreads: string[];
   emotionalTone: string;
-  
-  // Hierarchy
-  arcId: string | null;
 }
 ```
 
@@ -234,7 +232,142 @@ When `messagesSinceLastChapter >= N + X`:
 2. AI selects optimal chapter endpoint (natural story beat)
 3. Chapter is created with AI-generated summary
 
-#### 3.1.3 Retrieval Flow
+**Endpoint Selection Prompt:**
+
+```typescript
+async function selectChapterEndpoint(
+  messages: Message[],      // Messages in the N window
+  existingChapters: Chapter[]
+): Promise<EndpointSelection> {
+  return await aiCall({
+    model: config.models.summarization,
+    messages: [{
+      role: 'system',
+      content: `You analyze story segments to find natural chapter breaks.
+                Look for: scene transitions, emotional beats, revelations,
+                time skips, or significant character moments.`
+    }, {
+      role: 'user',
+      content: `STORY SEGMENT (messages ${startId} to ${endId}):
+${formatMessages(messages)}
+
+PREVIOUS CHAPTER ENDED WITH:
+${existingChapters.at(-1)?.summary || 'This is the first chapter.'}
+
+Select the best message ID to end this chapter at. Choose a moment that 
+feels like a natural pause - a scene ending, a revelation, a decision made.
+
+Return JSON:
+{
+  "endMessageId": "msg_xxx",
+  "reason": "Why this is a good chapter break",
+  "suggestedTitle": "A short evocative title"
+}`
+    }]
+  });
+}
+```
+
+**Summarization Prompt:**
+
+```typescript
+async function summarizeChapter(
+  messages: Message[],
+  chapterNumber: number
+): Promise<string> {
+  return await aiCall({
+    model: config.models.summarization,
+    messages: [{
+      role: 'system',
+      content: `You create concise chapter summaries for a story. Focus on:
+                - Key plot events and decisions
+                - Character developments and revelations  
+                - Important items, locations, or information introduced
+                - Relationship changes
+                Keep summaries to 2-4 paragraphs.`
+    }, {
+      role: 'user',
+      content: `CHAPTER ${chapterNumber} CONTENT:
+${formatMessages(messages)}
+
+Write a summary capturing the essential events and developments.`
+    }]
+  });
+}
+```
+
+**Metadata Extraction:**
+
+After summarization, a fast extraction call pulls structured metadata:
+
+```typescript
+interface ChapterMetadata {
+  keywords: string[];
+  characters: string[];        // Characters who appear
+  locations: string[];         // Locations visited
+  plotThreads: string[];       // Story threads active/advanced
+  emotionalTone: string;       // Overall mood
+}
+```
+
+This metadata enables faster retrieval decisions without reading full summaries.
+
+#### 3.1.3 Memory Query Tools
+
+The memory system exposes tools that can be used by retrieval and other agentic systems:
+
+```typescript
+interface MemoryTools {
+  // List available chapters with summaries
+  list_chapters(): {
+    chapters: {
+      number: number;
+      summary: string;
+      messageRange: { start: number; end: number };
+      characters: string[];
+      locations: string[];
+    }[];
+  };
+  
+  // Query a single chapter with a specific question
+  query_chapter(params: {
+    chapterNumber: number;
+    question: string;
+  }): {
+    chapterNumber: number;
+    question: string;
+    answer: string;
+  };
+  
+  // Query a range of chapters (for broader questions)
+  query_chapters(params: {
+    startChapter: number;
+    endChapter: number;
+    question: string;
+  }): {
+    range: { start: number; end: number };
+    question: string;
+    answer: string;
+  };
+  
+  // Get chapter summary only (no AI call)
+  get_chapter_summary(chapterNumber: number): {
+    number: number;
+    summary: string;
+    characters: string[];
+    locations: string[];
+    plotThreads: string[];
+  };
+}
+```
+
+#### 3.1.4 Retrieval Flow
+
+Before the narrator generates a response, the memory system retrieves relevant context from past chapters.
+
+**Static Retrieval (Default)**
+
+Fast, predictable, runs every turn:
 
 ```
 UserInput
@@ -245,7 +378,11 @@ UserInput
 │    "Given this input and these chapter  │
 │     summaries, which chapters matter?"  │
 │                                         │
-│    Returns: [chapter 3, chapter 7]      │
+│    Input: user message + chapter list   │
+│    Output: [                            │
+│      { chapter: 3, query: "What did..." },
+│      { chapter: 7, query: "How did..." }
+│    ]                                    │
 └─────────────────────────────────────────┘
     │
     ▼
@@ -264,21 +401,83 @@ UserInput
 ContextReady → Narrator
 ```
 
-#### 3.1.4 Hierarchical Summaries
+**Agentic Retrieval (Optional)**
 
-For long stories, summaries are hierarchical:
+More thorough, for complex situations where the AI needs to explore:
 
 ```
-Story Level:    "A herbalist's quest to find a cure..."
-                
-Arc Level:      Arc 1: "The Search Begins" (Ch 1-8)
-                Arc 2: "The Merchant's Secret" (Ch 9-15)
-                
-Chapter Level:  Ch 16: "Departure from Thornwick..."
-                Ch 17: "First night camping..."
+UserInput
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│ Retrieval Agent Loop                    │
+│                                         │
+│ Agent has access to:                    │
+│ • list_chapters()                       │
+│ • query_chapter(n, question)            │
+│ • query_chapters(start, end, question)  │
+│ • list_entries() (for cross-reference)  │
+│ • finish_retrieval(summary)             │
+│                                         │
+│ Agent iteratively queries until it has  │
+│ gathered sufficient context, then calls │
+│ finish_retrieval with synthesized info  │
+└─────────────────────────────────────────┘
+    │
+    ▼
+ContextReady → Narrator
 ```
 
-Retrieval first shows arc summaries, then drills into relevant chapters.
+**When to use Agentic Retrieval:**
+- Very long stories (50+ chapters) where targeted exploration helps
+- Complex queries that reference multiple interrelated events
+- User explicitly requests "deep recall"
+
+**Configuration:**
+
+```typescript
+interface RetrievalConfig {
+  mode: 'static' | 'agentic' | 'auto';
+  
+  // Static mode settings
+  maxQueriesPerTurn: number;        // Default: 5
+  maxChaptersPerQuery: number;      // Default: 3
+  
+  // Agentic mode settings
+  maxAgentIterations: number;       // Default: 10
+  
+  // Auto mode thresholds
+  agenticThreshold: number;         // Use agentic if chapters > N (default: 30)
+}
+```
+
+#### 3.1.5 Query Execution
+
+Individual chapter queries use a focused prompt:
+
+```typescript
+async function queryChapter(chapter: Chapter, question: string): Promise<string> {
+  return await aiCall({
+    model: config.models.query,  // Fast model
+    messages: [{
+      role: 'system',
+      content: `You answer questions about a story chapter. Be specific and 
+                include relevant details. If the chapter doesn't contain 
+                relevant information, say so briefly.`
+    }, {
+      role: 'user',
+      content: `CHAPTER ${chapter.number} CONTENT:
+${chapter.fullContent}
+
+QUESTION: ${question}
+
+Answer concisely with only the relevant information.`
+    }]
+  });
+}
+```
+
+For range queries (`query_chapters`), chapter contents are concatenated (respecting token limits) and queried together.
 
 ---
 
@@ -447,7 +646,150 @@ interface ClassificationResult {
 
 ---
 
-### 3.4 Checkpoints
+### 3.4 Lore Management Mode
+
+While the Classifier updates entries reactively after each message, Lore Management Mode is a dedicated agentic system for comprehensive lore maintenance.
+
+#### 3.4.1 Purpose
+
+- Review story holistically and identify gaps in tracked lore
+- Consolidate scattered information about characters/locations
+- Update outdated entries that no longer reflect story state
+- Create missing entries for important elements
+- Clean up redundant or contradictory entries
+
+#### 3.4.2 When It Runs
+
+- **On-demand:** User triggers via settings/command
+- **Suggested:** After major story milestones (e.g., chapter threshold reached)
+- **Never automatic:** Always requires user confirmation (it modifies data)
+
+#### 3.4.3 Agent Tools
+
+The Lore Management agent has access to:
+
+```typescript
+interface LoreManagementTools {
+  // === Entry Operations ===
+  
+  // Read operations
+  list_entries(filter?: { type?: EntryType }): EntryPreview[];
+  get_entry(entryId: string): Entry;
+  
+  // Write operations
+  create_entry(entry: NewEntry): Entry;
+  update_entry(entryId: string, changes: Partial<Entry>): Entry;
+  merge_entries(entryIds: string[], mergedEntry: NewEntry): Entry;
+  delete_entry(entryId: string): void;
+  
+  // === Memory/Story Access ===
+  
+  // Get recent messages directly
+  get_recent_story(messageCount: number): Message[];
+  
+  // Chapter tools (same as Memory system)
+  list_chapters(): ChapterList;
+  get_chapter_summary(chapterNumber: number): ChapterSummary;
+  query_chapter(chapterNumber: number, question: string): QueryResult;
+  query_chapters(startChapter: number, endChapter: number, question: string): QueryResult;
+  
+  // === Completion ===
+  
+  finish_lore_management(summary: string): void;
+}
+```
+
+The memory query tools (`query_chapter`, `query_chapters`) allow the agent to dig into specific chapter content when summaries aren't sufficient. For example:
+
+- "I need to verify when Elena first learned about the Order" → `query_chapters(1, 5, "When did Elena first learn about the Order?")`
+- "What exactly did the merchant say about the amulet's origin?" → `query_chapter(3, "What did the merchant reveal about the amulet's origin?")`
+
+#### 3.4.4 Agent Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ LORE MANAGEMENT SESSION                                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Agent receives: current entries + recent story + summaries  │
+│                                                                 │
+│  2. Agent analyzes gaps and inconsistencies                     │
+│                                                                 │
+│  3. Agent uses tools iteratively:                               │
+│     - "I see references to 'the Order' but no entry exists"    │
+│     → create_entry({ name: "The Order", type: "faction", ... })│
+│                                                                 │
+│     - "Elena's description is outdated after Chapter 5"        │
+│     → update_entry("elena-id", { description: "..." })         │
+│                                                                 │
+│     - "Two entries for the same tavern"                        │
+│     → merge_entries(["tavern-1", "tavern-2"], { ... })         │
+│                                                                 │
+│  4. Agent calls finish_lore_management() when done              │
+│                                                                 │
+│  5. User shown summary of changes for review                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.4.5 User Review
+
+After the agent finishes, user sees:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ LORE MANAGEMENT COMPLETE                                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ Changes made:                                                   │
+│                                                                 │
+│ CREATED (3)                                                     │
+│ • The Order (faction) - "A secretive organization that..."     │
+│ • Thornwick Market (location) - "The central marketplace..."   │
+│ • The Wasting Sickness (concept) - "A mysterious illness..."   │
+│                                                                 │
+│ UPDATED (2)                                                     │
+│ • Elena - Added relationship history with merchant              │
+│ • Bronze Amulet - Updated with revealed origin                  │
+│                                                                 │
+│ MERGED (1)                                                      │
+│ • "Silver Stag Tavern" + "The Tavern" → "Silver Stag Tavern"   │
+│                                                                 │
+│                              [ Accept All ]  [ Review Each ]    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.4.6 Lore Management Prompt
+
+```
+You are a lore manager for an interactive story. Your job is to 
+maintain a consistent, comprehensive database of story elements.
+
+CURRENT ENTRIES:
+{entries}
+
+RECENT STORY (last {n} messages):
+{recentMessages}
+
+CHAPTER SUMMARIES:
+{chapterSummaries}
+
+Your tasks:
+1. Identify important characters, locations, items, factions, and 
+   concepts that appear in the story but have no entry
+2. Find entries that are outdated or incomplete based on story events
+3. Identify redundant entries that should be merged
+4. Update relationship statuses and character states
+
+Use your tools to make necessary changes. Be conservative - only 
+create entries for elements that are genuinely important to the 
+story. When finished, call finish_lore_management with a summary.
+```
+
+---
+
+### 3.5 Checkpoints
 
 Checkpoints provide simple save/restore functionality without branching complexity.
 
@@ -466,7 +808,6 @@ interface Checkpoint {
     messages: Message[];
     entries: Entry[];
     chapters: Chapter[];
-    arcs: Arc[];
   };
 }
 ```
@@ -820,8 +1161,7 @@ my_story.aventura/
 ├── history/
 │   └── messages.jsonl         # Chat history (append-only)
 ├── memory/
-│   ├── chapters.json          # Chapter summaries
-│   └── arcs.json              # Arc-level summaries
+│   └── chapters.json          # Chapter summaries
 ├── checkpoints/
 │   └── {id}.json              # Checkpoint snapshots
 ├── assets/
@@ -883,7 +1223,6 @@ interface MemoryConfig {
   autoSummarize: boolean;
   enableRetrieval: boolean;
   maxChaptersPerRetrieval: number;
-  enableArcs: boolean;
 }
 
 // Entry Configuration
@@ -1204,10 +1543,58 @@ class MemoryModule implements Module {
   name = 'memory';
   triggers = ['UserInput', 'ClassificationComplete'];
   
-  // Phase 1: Pre-generation
+  private config: MemoryConfig;
+  
+  // === TOOLS (exposed to agentic systems) ===
+  
+  tools: MemoryTools = {
+    list_chapters: () => {
+      return getChapters().map(ch => ({
+        number: ch.number,
+        summary: ch.summary,
+        messageRange: { start: ch.startMessageId, end: ch.endMessageId },
+        characters: ch.characters,
+        locations: ch.locations
+      }));
+    },
+    
+    query_chapter: async ({ chapterNumber, question }) => {
+      const chapter = getChapter(chapterNumber);
+      if (!chapter) throw new Error(`Chapter ${chapterNumber} not found`);
+      
+      const answer = await this.executeQuery(chapter, question);
+      return { chapterNumber, question, answer };
+    },
+    
+    query_chapters: async ({ startChapter, endChapter, question }) => {
+      const chapters = getChaptersInRange(startChapter, endChapter);
+      const combinedContent = chapters.map(ch => 
+        `=== Chapter ${ch.number} ===\n${ch.fullContent}`
+      ).join('\n\n');
+      
+      const answer = await this.executeRangeQuery(combinedContent, question);
+      return { range: { start: startChapter, end: endChapter }, question, answer };
+    },
+    
+    get_chapter_summary: (chapterNumber) => {
+      const chapter = getChapter(chapterNumber);
+      if (!chapter) throw new Error(`Chapter ${chapterNumber} not found`);
+      return {
+        number: chapter.number,
+        summary: chapter.summary,
+        characters: chapter.characters,
+        locations: chapter.locations,
+        plotThreads: chapter.plotThreads
+      };
+    }
+  };
+  
+  // === PHASE 1: Pre-generation retrieval ===
+  
   async handleUserInput(event: UserInputEvent): Promise<void> {
     const chapters = getChapters();
     
+    // Skip if no history
     if (chapters.length === 0) {
       eventBus.emit('ContextReady', { 
         retrievedContext: null,
@@ -1216,17 +1603,113 @@ class MemoryModule implements Module {
       return;
     }
     
-    const decision = await this.decideRetrieval(event.text, chapters);
-    const context = await this.executeQueriesParallel(decision);
+    // Choose retrieval mode
+    const useAgentic = this.config.mode === 'agentic' || 
+      (this.config.mode === 'auto' && chapters.length > this.config.agenticThreshold);
     
-    eventBus.emit('ContextReady', { retrievedContext: context, userInput: event.text });
+    const context = useAgentic 
+      ? await this.agenticRetrieval(event.text, chapters)
+      : await this.staticRetrieval(event.text, chapters);
+    
+    eventBus.emit('ContextReady', { 
+      retrievedContext: context, 
+      userInput: event.text 
+    });
   }
   
-  // Phase 4: Post-processing
-  async handleClassificationComplete(event: ClassificationEvent): Promise<void> {
-    if (event.chapterAnalysis.shouldCreateChapter) {
-      await this.createChapter(event.chapterAnalysis);
+  private async staticRetrieval(
+    userInput: string, 
+    chapters: Chapter[]
+  ): Promise<RetrievedContext> {
+    // 1. Decide what to query
+    const decision = await this.decideRetrieval(userInput, chapters);
+    
+    // 2. Execute queries in parallel
+    const queryPromises = decision.queries.map(q => 
+      this.tools.query_chapter({ 
+        chapterNumber: q.chapter, 
+        question: q.question 
+      })
+    );
+    
+    const results = await Promise.all(queryPromises);
+    
+    return {
+      queriedChapters: results,
+      retrievalTimestamp: new Date()
+    };
+  }
+  
+  private async agenticRetrieval(
+    userInput: string, 
+    chapters: Chapter[]
+  ): Promise<RetrievedContext> {
+    // Agent loop with tool access
+    let complete = false;
+    let iterations = 0;
+    let gatheredContext: QueryResult[] = [];
+    let messages = [{ role: 'user', content: this.buildAgentPrompt(userInput, chapters) }];
+    
+    while (!complete && iterations < this.config.maxAgentIterations) {
+      const response = await this.callRetrievalAgent(messages);
+      
+      for (const toolCall of response.toolCalls) {
+        if (toolCall.name === 'finish_retrieval') {
+          complete = true;
+          break;
+        }
+        
+        const result = await this.tools[toolCall.name](toolCall.args);
+        gatheredContext.push(result);
+        
+        messages.push({ role: 'assistant', content: response.content });
+        messages.push({ role: 'tool', content: JSON.stringify(result) });
+      }
+      
+      iterations++;
     }
+    
+    return {
+      queriedChapters: gatheredContext,
+      retrievalTimestamp: new Date()
+    };
+  }
+  
+  // === PHASE 4: Chapter creation ===
+  
+  async handleClassificationComplete(event: ClassificationEvent): Promise<void> {
+    if (!event.chapterAnalysis.shouldCreateChapter) return;
+    
+    const endpoint = event.chapterAnalysis.suggestedEndpoint;
+    await this.createChapter(endpoint);
+  }
+  
+  private async createChapter(endpoint: EndpointSelection): Promise<Chapter> {
+    const messages = getMessagesSinceLastChapter(endpoint.endMessageId);
+    
+    // Generate summary
+    const summary = await this.summarizeChapter(messages);
+    
+    // Extract metadata
+    const metadata = await this.extractMetadata(messages, summary);
+    
+    const chapter: Chapter = {
+      id: generateId(),
+      number: getChapters().length + 1,
+      startMessageId: getLastChapterEnd() || messages[0].id,
+      endMessageId: endpoint.endMessageId,
+      messageCount: messages.length,
+      summary,
+      fullContent: formatMessages(messages),
+      createdAt: new Date(),
+      ...metadata
+    };
+    
+    saveChapter(chapter);
+    
+    eventBus.emit('ChapterCreated', { chapter });
+    
+    return chapter;
   }
 }
 ```
@@ -1403,6 +1886,97 @@ class SuggestionsModule implements Module {
     
     eventBus.emit('SuggestionsReady', { suggestions });
   }
+}
+```
+
+### A.8 Lore Management Module
+
+```typescript
+class LoreManagementModule implements Module {
+  name = 'lore-management';
+  triggers = [];  // On-demand only, not event-triggered
+  
+  private tools: LoreManagementTools;
+  private changes: LoreChange[] = [];
+  
+  async runSession(): Promise<LoreManagementResult> {
+    this.changes = [];
+    
+    const context = {
+      entries: getAllEntries(),
+      recentMessages: getRecentMessages(100),
+      chapterSummaries: getChapterSummaries()
+    };
+    
+    // Agent loop with tool calls
+    let complete = false;
+    let messages = [{ role: 'user', content: this.buildPrompt(context) }];
+    
+    while (!complete) {
+      const response = await this.callAgent(messages);
+      
+      for (const toolCall of response.toolCalls) {
+        const result = await this.executeTool(toolCall);
+        
+        if (toolCall.name === 'finish_lore_management') {
+          complete = true;
+        }
+        
+        messages.push({ role: 'assistant', content: response.content });
+        messages.push({ role: 'tool', content: result });
+      }
+    }
+    
+    return {
+      changes: this.changes,
+      summary: this.changes[this.changes.length - 1]?.summary || ''
+    };
+  }
+  
+  private async executeTool(toolCall: ToolCall): Promise<string> {
+    switch (toolCall.name) {
+      case 'create_entry':
+        const created = await createEntry(toolCall.args);
+        this.changes.push({ type: 'create', entry: created });
+        return JSON.stringify(created);
+        
+      case 'update_entry':
+        const updated = await updateEntry(toolCall.args.id, toolCall.args.changes);
+        this.changes.push({ type: 'update', entry: updated, previous: toolCall.args.previous });
+        return JSON.stringify(updated);
+        
+      case 'merge_entries':
+        const merged = await mergeEntries(toolCall.args.ids, toolCall.args.merged);
+        this.changes.push({ type: 'merge', entry: merged, mergedFrom: toolCall.args.ids });
+        return JSON.stringify(merged);
+        
+      case 'delete_entry':
+        const deleted = await deleteEntry(toolCall.args.id);
+        this.changes.push({ type: 'delete', entry: deleted });
+        return 'Deleted';
+        
+      case 'finish_lore_management':
+        this.changes.push({ type: 'complete', summary: toolCall.args.summary });
+        return 'Session complete';
+        
+      default:
+        // Read-only operations
+        return JSON.stringify(await this.tools[toolCall.name](toolCall.args));
+    }
+  }
+}
+
+interface LoreChange {
+  type: 'create' | 'update' | 'merge' | 'delete' | 'complete';
+  entry?: Entry;
+  previous?: Partial<Entry>;
+  mergedFrom?: string[];
+  summary?: string;
+}
+
+interface LoreManagementResult {
+  changes: LoreChange[];
+  summary: string;
 }
 ```
 
