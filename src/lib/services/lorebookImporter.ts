@@ -5,6 +5,8 @@
  */
 
 import type { Entry, EntryType, EntryInjectionMode, EntryCreator } from '$lib/types';
+import { OpenRouterProvider } from './ai/openrouter';
+import { settings } from '$lib/stores/settings.svelte';
 
 const DEBUG = true;
 
@@ -173,6 +175,124 @@ function inferEntryType(name: string, content: string): EntryType {
   }
 
   return maxType;
+}
+
+/**
+ * LLM-based entry type classification using grok-4.1-fast with reasoning.
+ * Classifies entries in batches for efficiency.
+ */
+export async function classifyEntriesWithLLM(
+  entries: ImportedEntry[],
+  onProgress?: (classified: number, total: number) => void
+): Promise<ImportedEntry[]> {
+  if (entries.length === 0) return entries;
+
+  const apiKey = settings.apiSettings.openrouterApiKey;
+  if (!apiKey) {
+    log('No API key available, skipping LLM classification');
+    return entries;
+  }
+
+  const provider = new OpenRouterProvider(apiKey);
+  const BATCH_SIZE = 30;
+  const classifiedEntries = [...entries];
+
+  log('Starting LLM classification', { totalEntries: entries.length });
+
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE);
+    const batchIndex = Math.floor(i / BATCH_SIZE);
+
+    try {
+      // Build the prompt for this batch
+      const entriesForPrompt = batch.map((entry, idx) => ({
+        index: i + idx,
+        name: entry.name,
+        content: entry.description,
+        keywords: entry.keywords,
+      }));
+
+      const prompt = `Classify each lorebook entry into exactly one category. The categories are:
+- character: A person, creature, or being with personality/traits (NPCs, monsters, etc.)
+- location: A place, area, building, or geographic feature
+- item: An object, weapon, artifact, tool, or piece of equipment
+- faction: An organization, group, guild, kingdom, or collective entity
+- concept: A magic system, rule, tradition, technology, or abstract idea
+- event: A historical occurrence, battle, ceremony, or significant happening
+
+For each entry, output ONLY a JSON array with objects containing "index" and "type".
+
+Entries to classify:
+${JSON.stringify(entriesForPrompt, null, 2)}
+
+Respond with ONLY valid JSON in this exact format:
+[{"index": 0, "type": "character"}, {"index": 1, "type": "location"}, ...]`;
+
+      const response = await provider.generateResponse({
+        model: 'x-ai/grok-4.1-fast',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a precise classifier for fantasy/RPG lorebook entries. Analyze the name, content, and keywords to determine the most appropriate category. Be decisive - pick the single best category for each entry. Respond only with the JSON array.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        maxTokens: 1000,
+        extraBody: {
+          reasoning: {
+            max_tokens: 2000,
+          },
+        },
+      });
+
+      // Parse the response
+      try {
+        // Extract JSON from response (handle potential markdown code blocks)
+        let jsonStr = response.content.trim();
+        if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+        }
+
+        const classifications = JSON.parse(jsonStr) as { index: number; type: string }[];
+
+        for (const classification of classifications) {
+          const validTypes: EntryType[] = ['character', 'location', 'item', 'faction', 'concept', 'event'];
+          if (
+            typeof classification.index === 'number' &&
+            classification.index >= 0 &&
+            classification.index < classifiedEntries.length &&
+            validTypes.includes(classification.type as EntryType)
+          ) {
+            classifiedEntries[classification.index] = {
+              ...classifiedEntries[classification.index],
+              type: classification.type as EntryType,
+            };
+          }
+        }
+
+        log(`Batch ${batchIndex + 1} classified`, {
+          batchSize: batch.length,
+          classified: classifications.length
+        });
+      } catch (parseError) {
+        log('Failed to parse LLM classification response:', parseError);
+        // Keep original keyword-based types for this batch
+      }
+
+      // Report progress
+      if (onProgress) {
+        onProgress(Math.min(i + BATCH_SIZE, entries.length), entries.length);
+      }
+
+    } catch (error) {
+      log('LLM classification batch failed:', error);
+      // Keep original keyword-based types for this batch
+    }
+  }
+
+  log('LLM classification complete');
+  return classifiedEntries;
 }
 
 /**

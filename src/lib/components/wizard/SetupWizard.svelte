@@ -14,6 +14,7 @@
   } from '$lib/services/ai/scenario';
   import {
     parseSillyTavernLorebook,
+    classifyEntriesWithLLM,
     getImportSummary,
     type ImportedEntry,
     type LorebookImportResult,
@@ -89,6 +90,8 @@
   let importedLorebook = $state<LorebookImportResult | null>(null);
   let importedEntries = $state<ImportedEntry[]>([]);
   let isImporting = $state(false);
+  let isClassifying = $state(false);
+  let classificationProgress = $state({ current: 0, total: 0 });
   let importError = $state<string | null>(null);
   let importFileInput: HTMLInputElement | null = null;
 
@@ -397,7 +400,7 @@
   ];
 
   // Lorebook import functions
-  function handleFileSelect(event: Event) {
+  async function handleFileSelect(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -405,39 +408,59 @@
     importError = null;
     isImporting = true;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const result = parseSillyTavernLorebook(content);
+    try {
+      const content = await file.text();
+      const result = parseSillyTavernLorebook(content);
 
-        importedLorebook = result;
+      importedLorebook = result;
+
+      if (!result.success) {
+        importError = result.errors.join('; ') || 'Failed to parse lorebook';
         importedEntries = result.entries;
+        isImporting = false;
+        return;
+      }
 
-        if (!result.success) {
-          importError = result.errors.join('; ') || 'Failed to parse lorebook';
+      // Run LLM classification if we have entries and an API key
+      if (result.entries.length > 0 && settings.hasApiKey) {
+        isImporting = false;
+        isClassifying = true;
+        classificationProgress = { current: 0, total: result.entries.length };
+
+        try {
+          const classifiedEntries = await classifyEntriesWithLLM(
+            result.entries,
+            (current, total) => {
+              classificationProgress = { current, total };
+            }
+          );
+          importedEntries = classifiedEntries;
+        } catch (classifyError) {
+          console.error('LLM classification failed:', classifyError);
+          // Fall back to keyword-based classification
+          importedEntries = result.entries;
+        } finally {
+          isClassifying = false;
         }
-      } catch (err) {
-        importError = err instanceof Error ? err.message : 'Failed to read file';
-        importedLorebook = null;
-        importedEntries = [];
-      } finally {
+      } else {
+        importedEntries = result.entries;
         isImporting = false;
       }
-    };
-
-    reader.onerror = () => {
-      importError = 'Failed to read file';
+    } catch (err) {
+      importError = err instanceof Error ? err.message : 'Failed to read file';
+      importedLorebook = null;
+      importedEntries = [];
       isImporting = false;
-    };
-
-    reader.readAsText(file);
+      isClassifying = false;
+    }
   }
 
   function clearImport() {
     importedLorebook = null;
     importedEntries = [];
     importError = null;
+    isClassifying = false;
+    classificationProgress = { current: 0, total: 0 };
     if (importFileInput) {
       importFileInput.value = '';
     }
@@ -567,12 +590,13 @@
             This step is optional — you can skip it and add content later.
           </p>
 
-          {#if !importedLorebook}
+          {#if !importedLorebook || isClassifying}
             <!-- File Upload Area -->
             <div
               class="card bg-surface-900 border-dashed border-2 border-surface-600 p-8 text-center hover:border-accent-500/50 transition-colors cursor-pointer"
-              onclick={() => importFileInput?.click()}
-              onkeydown={(e) => e.key === 'Enter' && importFileInput?.click()}
+              class:pointer-events-none={isImporting || isClassifying}
+              onclick={() => !isImporting && !isClassifying && importFileInput?.click()}
+              onkeydown={(e) => e.key === 'Enter' && !isImporting && !isClassifying && importFileInput?.click()}
               role="button"
               tabindex="0"
             >
@@ -585,7 +609,19 @@
               />
               {#if isImporting}
                 <Loader2 class="h-8 w-8 mx-auto mb-2 text-accent-400 animate-spin" />
-                <p class="text-surface-300">Importing...</p>
+                <p class="text-surface-300">Parsing lorebook...</p>
+              {:else if isClassifying}
+                <Loader2 class="h-8 w-8 mx-auto mb-2 text-accent-400 animate-spin" />
+                <p class="text-surface-300 font-medium">Classifying entries with AI...</p>
+                <p class="text-xs text-surface-500 mt-1">
+                  {classificationProgress.current} / {classificationProgress.total} entries
+                </p>
+                <div class="mt-3 w-full max-w-xs mx-auto bg-surface-700 rounded-full h-2">
+                  <div
+                    class="bg-accent-500 h-2 rounded-full transition-all duration-300"
+                    style="width: {classificationProgress.total > 0 ? (classificationProgress.current / classificationProgress.total) * 100 : 0}%"
+                  ></div>
+                </div>
               {:else}
                 <Upload class="h-8 w-8 mx-auto mb-2 text-surface-500" />
                 <p class="text-surface-300 font-medium">Click to upload a lorebook</p>
@@ -593,13 +629,13 @@
               {/if}
             </div>
 
-            {#if importError}
+            {#if importError && !isClassifying}
               <div class="card bg-red-500/10 border-red-500/30 p-3 flex items-start gap-2">
                 <AlertCircle class="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                 <p class="text-sm text-red-400">{importError}</p>
               </div>
             {/if}
-          {:else}
+          {:else if !isClassifying}
             <!-- Import Results -->
             <div class="card bg-surface-900 p-4 space-y-4">
               <div class="flex items-center justify-between">
