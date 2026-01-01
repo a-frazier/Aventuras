@@ -413,43 +413,72 @@
       // Capture current story reference for use after streaming
       const currentStoryRef = story.currentStory;
 
-      // Use streaming response with visible entries only (non-summarized)
-      // Per design doc section 3.1.2: summarized entries are excluded from context
-      log('Starting stream iteration...', {
-        hasStyleReview: !!ui.lastStyleReview,
-        visibleEntries: story.visibleEntries.length,
-        totalEntries: story.entries.length,
-        hasRetrievedContext: !!combinedRetrievedContext,
-        hasLorebookContext: !!lorebookContext,
-      });
-      for await (const chunk of aiService.streamResponse(
-        story.visibleEntries,
-        worldState,
-        currentStoryRef,
-        true,
-        ui.lastStyleReview,
-        combinedRetrievedContext
-      )) {
-        chunkCount++;
-        if (chunk.content) {
-          fullResponse += chunk.content;
-          ui.appendStreamContent(chunk.content);
+      // Retry logic for empty responses
+      const MAX_EMPTY_RESPONSE_RETRIES = 3;
+      let retryCount = 0;
 
-          // Emit streaming event
-          eventBus.emit<ResponseStreamingEvent>({
-            type: 'ResponseStreaming',
-            chunk: chunk.content,
-            accumulated: fullResponse,
-          });
+      while (retryCount < MAX_EMPTY_RESPONSE_RETRIES) {
+        // Reset for each attempt
+        fullResponse = '';
+        chunkCount = 0;
+
+        if (retryCount > 0) {
+          log(`Retrying generation (attempt ${retryCount + 1}/${MAX_EMPTY_RESPONSE_RETRIES}) due to empty response...`);
+          // startStreaming() clears previous content and restarts
+          ui.startStreaming();
         }
 
-        if (chunk.done) {
-          log('Stream done signal received');
-          break;
+        // Use streaming response with visible entries only (non-summarized)
+        // Per design doc section 3.1.2: summarized entries are excluded from context
+        log('Starting stream iteration...', {
+          hasStyleReview: !!ui.lastStyleReview,
+          visibleEntries: story.visibleEntries.length,
+          totalEntries: story.entries.length,
+          hasRetrievedContext: !!combinedRetrievedContext,
+          hasLorebookContext: !!lorebookContext,
+          attempt: retryCount + 1,
+        });
+
+        for await (const chunk of aiService.streamResponse(
+          story.visibleEntries,
+          worldState,
+          currentStoryRef,
+          true,
+          ui.lastStyleReview,
+          combinedRetrievedContext
+        )) {
+          chunkCount++;
+          if (chunk.content) {
+            fullResponse += chunk.content;
+            ui.appendStreamContent(chunk.content);
+
+            // Emit streaming event
+            eventBus.emit<ResponseStreamingEvent>({
+              type: 'ResponseStreaming',
+              chunk: chunk.content,
+              accumulated: fullResponse,
+            });
+          }
+
+          if (chunk.done) {
+            log('Stream done signal received');
+            break;
+          }
+        }
+
+        log('Stream complete', { chunkCount, responseLength: fullResponse.length, attempt: retryCount + 1 });
+
+        // Check if we got a valid response
+        if (fullResponse.trim()) {
+          break; // Success, exit retry loop
+        }
+
+        // Empty response, increment retry counter
+        retryCount++;
+        if (retryCount < MAX_EMPTY_RESPONSE_RETRIES) {
+          log(`Empty response received, will retry (${retryCount}/${MAX_EMPTY_RESPONSE_RETRIES})...`);
         }
       }
-
-      log('Stream complete', { chunkCount, responseLength: fullResponse.length });
 
       // End streaming immediately to prevent duplicate display
       // (StreamingEntry would show alongside the saved entry otherwise)
@@ -523,7 +552,18 @@
           log('Style review check failed (non-fatal)', err);
         });
       } else {
-        log('No response content to save (fullResponse was empty or whitespace)');
+        log(`No response content after ${MAX_EMPTY_RESPONSE_RETRIES} attempts (fullResponse was empty or whitespace)`);
+        // Add a system message to inform the user
+        const errorMessage = `The AI returned an empty response after ${MAX_EMPTY_RESPONSE_RETRIES} attempts. Please try again.`;
+        const errorEntry = await story.addEntry('system', errorMessage);
+
+        // Store error state for retry button to work
+        ui.setGenerationError({
+          message: errorMessage,
+          errorEntryId: errorEntry.id,
+          userActionEntryId: userActionEntryId,
+          timestamp: Date.now(),
+        });
       }
     } catch (error) {
       log('Generation failed', error);

@@ -11,7 +11,8 @@
     entry.type === 'system' && (
       ui.lastGenerationError?.errorEntryId === entry.id ||
       entry.content.toLowerCase().includes('generation failed') ||
-      entry.content.toLowerCase().includes('failed to generate')
+      entry.content.toLowerCase().includes('failed to generate') ||
+      entry.content.toLowerCase().includes('empty response')
     )
   );
 
