@@ -62,7 +62,14 @@ class StoryStore {
 
   get pov(): 'first' | 'second' | 'third' {
     const mode = this.currentStory?.mode ?? 'adventure';
-    return this.currentStory?.settings?.pov ?? (mode === 'creative-writing' ? 'third' : 'second');
+    const stored = this.currentStory?.settings?.pov ?? null;
+    if (mode === 'creative-writing') {
+      return 'third';
+    }
+    if (!stored || stored === 'second') {
+      return 'first';
+    }
+    return stored;
   }
 
   get inventoryItems(): Item[] {

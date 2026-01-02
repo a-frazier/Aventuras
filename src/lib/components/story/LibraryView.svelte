@@ -35,6 +35,15 @@
     story.loadAllStories();
   });
 
+  // Enforce POV constraints by mode
+  $effect(() => {
+    if (selectedMode === 'creative-writing') {
+      selectedPOV = 'third';
+    } else if (selectedPOV === 'second') {
+      selectedPOV = 'first';
+    }
+  });
+
   function selectTemplate(templateId: string) {
     selectedTemplateId = templateId;
     step = 'details';
@@ -351,35 +360,35 @@
             <label class="mb-2 block text-sm font-medium text-surface-300">
               Point of View
             </label>
-            <div class="grid grid-cols-3 gap-2">
-              <button
-                class="card p-3 text-center transition-all"
-                class:ring-2={selectedPOV === 'first'}
-                class:ring-accent-500={selectedPOV === 'first'}
-                onclick={() => selectedPOV = 'first'}
-              >
-                <span class="block font-medium text-surface-100">1st Person</span>
-                <span class="text-xs text-surface-400">I say...</span>
-              </button>
-              <button
-                class="card p-3 text-center transition-all"
-                class:ring-2={selectedPOV === 'second'}
-                class:ring-accent-500={selectedPOV === 'second'}
-                onclick={() => selectedPOV = 'second'}
-              >
-                <span class="block font-medium text-surface-100">2nd Person</span>
-                <span class="text-xs text-surface-400">You say...</span>
-              </button>
-              <button
-                class="card p-3 text-center transition-all"
-                class:ring-2={selectedPOV === 'third'}
-                class:ring-accent-500={selectedPOV === 'third'}
-                onclick={() => selectedPOV = 'third'}
-              >
-                <span class="block font-medium text-surface-100">3rd Person</span>
-                <span class="text-xs text-surface-400">Name says...</span>
-              </button>
-            </div>
+            {#if selectedMode === 'creative-writing'}
+              <div class="grid grid-cols-1 gap-2">
+                <button class="card p-3 text-center opacity-70 cursor-not-allowed" disabled>
+                  <span class="block font-medium text-surface-100">3rd Person</span>
+                  <span class="text-xs text-surface-400">Required for creative writing</span>
+                </button>
+              </div>
+            {:else}
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  class="card p-3 text-center transition-all"
+                  class:ring-2={selectedPOV === 'first'}
+                  class:ring-accent-500={selectedPOV === 'first'}
+                  onclick={() => selectedPOV = 'first'}
+                >
+                  <span class="block font-medium text-surface-100">1st Person</span>
+                  <span class="text-xs text-surface-400">I say...</span>
+                </button>
+                <button
+                  class="card p-3 text-center transition-all"
+                  class:ring-2={selectedPOV === 'third'}
+                  class:ring-accent-500={selectedPOV === 'third'}
+                  onclick={() => selectedPOV = 'third'}
+                >
+                  <span class="block font-medium text-surface-100">3rd Person</span>
+                  <span class="text-xs text-surface-400">Name says...</span>
+                </button>
+              </div>
+            {/if}
           </div>
 
           <!-- Story Title -->

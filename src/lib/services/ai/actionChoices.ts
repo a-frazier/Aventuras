@@ -83,12 +83,10 @@ export class ActionChoicesService {
 
     // Determine POV instruction for action phrasing
     let povInstruction: string;
-    if (pov === 'first') {
-      povInstruction = 'Write actions in first person (e.g., "I examine the door", "I ask the merchant about...")';
-    } else if (pov === 'third') {
+    if (pov === 'third') {
       povInstruction = 'Write actions as commands/intentions (e.g., "Examine the door", "Ask the merchant about...")';
     } else {
-      povInstruction = 'Write actions in second person imperative or first person (e.g., "Examine the door", "I ask the merchant about...")';
+      povInstruction = 'Write actions in first person (e.g., "I examine the door", "I ask the merchant about...")';
     }
 
     // Get protagonist name for the prompt

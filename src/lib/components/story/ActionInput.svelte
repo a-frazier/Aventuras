@@ -337,14 +337,6 @@
   // Generate action prefixes based on POV
   const actionPrefixes = $derived.by(() => {
     switch (pov) {
-      case 'first':
-        return {
-          do: 'I ',
-          say: 'I say, "',
-          think: 'I think to myself, "',
-          story: '',
-          free: '',
-        };
       case 'third':
         return {
           do: `${protagonistName} `,
@@ -353,12 +345,13 @@
           story: '',
           free: '',
         };
+      case 'first':
       case 'second':
       default:
         return {
-          do: 'You ',
-          say: 'You say, "',
-          think: 'You think to yourself, "',
+          do: 'I ',
+          say: 'I say, "',
+          think: 'I think to myself, "',
           story: '',
           free: '',
         };

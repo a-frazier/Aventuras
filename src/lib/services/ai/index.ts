@@ -59,8 +59,11 @@ class AIService {
 
     // Build the system prompt with world state context
     const systemPromptOverride = story?.settings?.systemPromptOverride;
-    const pov = story?.settings?.pov ?? (mode === 'creative-writing' ? 'third' : 'second');
-    const systemPrompt = this.buildSystemPrompt(worldState, story?.templateId, undefined, mode, undefined, systemPromptOverride, pov);
+    const pov = story?.settings?.pov ?? (mode === 'creative-writing' ? 'third' : 'first');
+    const promptPov = mode === 'creative-writing'
+      ? 'third'
+      : (pov === 'third' ? 'third' : 'second');
+    const systemPrompt = this.buildSystemPrompt(worldState, story?.templateId, undefined, mode, undefined, systemPromptOverride, promptPov);
     log('System prompt built, length:', systemPrompt.length, 'mode:', mode);
 
     // Build conversation history
@@ -70,7 +73,7 @@ class AIService {
 
     // Add priming user message to establish narrator role
     const tense = story?.settings?.tense ?? (mode === 'creative-writing' ? 'past' : 'present');
-    const primingMessage = this.buildPrimingMessage(mode, pov, tense);
+    const primingMessage = this.buildPrimingMessage(mode, promptPov, tense);
     messages.push({ role: 'user', content: primingMessage });
 
     // Add recent entries as conversation history
@@ -175,7 +178,10 @@ class AIService {
 
     // Build the system prompt with world state context
     const systemPromptOverride = story?.settings?.systemPromptOverride;
-    const pov = story?.settings?.pov ?? (mode === 'creative-writing' ? 'third' : 'second');
+    const pov = story?.settings?.pov ?? (mode === 'creative-writing' ? 'third' : 'first');
+    const promptPov = mode === 'creative-writing'
+      ? 'third'
+      : (pov === 'third' ? 'third' : 'second');
     let systemPrompt = this.buildSystemPrompt(
       worldState,
       story?.templateId,
@@ -183,7 +189,7 @@ class AIService {
       mode,
       tieredContextBlock,
       systemPromptOverride,
-      pov
+      promptPov
     );
 
     // Inject chapter summaries if chapters exist
@@ -211,7 +217,7 @@ class AIService {
 
     // Add priming user message to establish narrator role
     const tense = story?.settings?.tense ?? (mode === 'creative-writing' ? 'past' : 'present');
-    const primingMessage = this.buildPrimingMessage(mode, pov, tense);
+    const primingMessage = this.buildPrimingMessage(mode, promptPov, tense);
     messages.push({ role: 'user', content: primingMessage });
 
     // Add ALL visible entries as conversation history

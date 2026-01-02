@@ -134,11 +134,17 @@
   ];
 
   // POV options
-  const povOptions: { id: POV; label: string; example: string }[] = [
-    { id: 'first', label: '1st Person', example: 'I walk into the room...' },
-    { id: 'second', label: '2nd Person', example: 'You walk into the room...' },
-    { id: 'third', label: '3rd Person', example: 'They walk into the room...' },
-  ];
+  const povOptions = $derived.by((): { id: POV; label: string; example: string }[] => {
+    if (selectedMode === 'creative-writing') {
+      return [
+        { id: 'third', label: '3rd Person', example: 'They walk into the room...' },
+      ];
+    }
+    return [
+      { id: 'first', label: '1st Person', example: 'I walk into the room...' },
+      { id: 'third', label: '3rd Person', example: 'They walk into the room...' },
+    ];
+  });
 
   // Tense options
   const tenseOptions: { id: Tense; label: string; example: string }[] = [
@@ -1409,7 +1415,7 @@
           <!-- POV Selection -->
           <div>
             <label class="mb-2 block text-sm font-medium text-surface-300">Point of View</label>
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid gap-2 {selectedMode === 'creative-writing' ? 'grid-cols-1' : 'grid-cols-2'}">
               {#each povOptions as option}
                 <button
                   class="card p-3 text-center transition-all"
