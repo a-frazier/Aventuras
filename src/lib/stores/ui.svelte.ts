@@ -19,6 +19,9 @@ export interface RetryBackup {
   lorebookEntries: Entry[];
   // The user's input to re-trigger
   userActionContent: string;
+  // Lorebook activation tracking data (for stickiness preservation)
+  activationData: Record<string, number>;
+  storyPosition: number;
 }
 
 // Error state for retry functionality
@@ -191,6 +194,7 @@ class UIStore {
   /**
    * Create a backup of the current story state before a user message.
    * This captures the state BEFORE the user action is added, so we can restore to this point.
+   * Also captures lorebook activation data for stickiness preservation.
    */
   createRetryBackup(
     storyId: string,
@@ -214,11 +218,15 @@ class UIStore {
       storyBeats: [...storyBeats],
       lorebookEntries: [...lorebookEntries],
       userActionContent,
+      // Capture activation data for lorebook stickiness preservation
+      activationData: { ...this.activationData },
+      storyPosition: this.currentStoryPosition,
     };
     console.log('[UI] Retry backup created', {
       storyId,
       entriesCount: entries.length,
       userAction: userActionContent.substring(0, 50),
+      activationEntries: Object.keys(this.activationData).length,
     });
   }
 
@@ -235,6 +243,19 @@ class UIStore {
    */
   hasRetryBackup(storyId: string): boolean {
     return this.retryBackup !== null && this.retryBackup.storyId === storyId;
+  }
+
+  /**
+   * Restore activation data from a backup.
+   * Called during "retry last message" to preserve lorebook stickiness state.
+   */
+  restoreActivationData(activationData: Record<string, number>, storyPosition: number) {
+    this.activationData = { ...activationData };
+    this.currentStoryPosition = storyPosition;
+    console.log('[UI] Activation data restored from backup', {
+      entriesCount: Object.keys(activationData).length,
+      storyPosition,
+    });
   }
 
   // Action choices methods

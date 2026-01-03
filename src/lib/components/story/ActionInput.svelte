@@ -885,6 +885,13 @@
     ui.clearSuggestions();
     ui.clearActionChoices();
 
+    // Restore activation data from backup to preserve lorebook stickiness state
+    // This ensures entries that were "sticky" before the user action remain sticky
+    ui.restoreActivationData(backup.activationData, backup.storyPosition);
+
+    // Clear lorebook retrieval debug state since it's now stale
+    ui.setLastLorebookRetrieval(null);
+
     try {
       // Restore story state from backup
       await story.restoreFromRetryBackup({

@@ -298,6 +298,12 @@ class StoryStore {
       checkpoints: checkpoints.length,
     });
 
+    // Clear activation data from previous story (stickiness tracking is story-specific)
+    ui.clearActivationData();
+
+    // Clear retry backup from previous story
+    ui.clearRetryBackup();
+
     // Validate and repair chapter integrity (handles orphaned references)
     await this.validateChapterIntegrity();
 
