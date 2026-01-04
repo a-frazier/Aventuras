@@ -5,9 +5,11 @@
   import { grammarService } from '$lib/services/grammar';
   import { updaterService } from '$lib/services/updater';
   import AppShell from '$lib/components/layout/AppShell.svelte';
+  import ProviderSetupModal from '$lib/components/settings/ProviderSetupModal.svelte';
 
   let initialized = $state(false);
   let error = $state<string | null>(null);
+  let showProviderSetup = $state(false);
 
   onMount(async () => {
     try {
@@ -16,6 +18,13 @@
 
       // Initialize settings from database
       await settings.init();
+
+      // Check if this is a first-run (new user)
+      if (!settings.firstRunComplete) {
+        showProviderSetup = true;
+        // Don't fully initialize until provider is selected
+        return;
+      }
 
       // Pre-load grammar checker WASM in background (don't await)
       grammarService.setup().catch(console.error);
@@ -52,7 +61,20 @@
       error = e instanceof Error ? e.message : 'Failed to initialize application';
     }
   });
+
+  function handleProviderSetupComplete() {
+    showProviderSetup = false;
+    // Continue with initialization
+    grammarService.setup().catch(console.error);
+    initialized = true;
+  }
 </script>
+
+<!-- Provider Setup Modal (First Run) -->
+<ProviderSetupModal
+  isOpen={showProviderSetup}
+  onComplete={handleProviderSetupComplete}
+/>
 
 {#if error}
   <div class="flex h-screen w-screen items-center justify-center bg-surface-900">
@@ -65,6 +87,13 @@
       >
         Retry
       </button>
+    </div>
+  </div>
+{:else if showProviderSetup}
+  <!-- Show loading background while provider setup is shown -->
+  <div class="flex h-screen w-screen items-center justify-center bg-surface-900">
+    <div class="flex flex-col items-center gap-4">
+      <p class="text-surface-400">Welcome to Aventura</p>
     </div>
   </div>
 {:else if !initialized}

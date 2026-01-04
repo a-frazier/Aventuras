@@ -66,6 +66,8 @@ export interface EntryRetrievalConfig {
   recentEntriesCount: number;
   /** Model to use for Tier 3 selection */
   tier3Model: string;
+  /** Temperature for Tier 3 selection */
+  temperature: number;
 }
 
 export const DEFAULT_ENTRY_RETRIEVAL_CONFIG: EntryRetrievalConfig = {
@@ -73,7 +75,23 @@ export const DEFAULT_ENTRY_RETRIEVAL_CONFIG: EntryRetrievalConfig = {
   enableLLMSelection: true,
   recentEntriesCount: 5,
   tier3Model: 'x-ai/grok-4.1-fast',
+  temperature: 0.2,
 };
+
+/**
+ * Get entry retrieval config from settings store.
+ * Falls back to defaults if settings not initialized.
+ */
+export function getEntryRetrievalConfigFromSettings(): EntryRetrievalConfig {
+  const entrySettings = settings.systemServicesSettings.entryRetrieval;
+  return {
+    maxTier3Entries: entrySettings.maxTier3Entries ?? 0,
+    enableLLMSelection: entrySettings.enableLLMSelection ?? true,
+    recentEntriesCount: 5, // Not configurable currently
+    tier3Model: entrySettings.model ?? DEFAULT_ENTRY_RETRIEVAL_CONFIG.tier3Model,
+    temperature: entrySettings.temperature ?? DEFAULT_ENTRY_RETRIEVAL_CONFIG.temperature,
+  };
+}
 
 export interface RetrievedEntry {
   entry: Entry;
@@ -544,7 +562,7 @@ Return an empty array [] if none are relevant.`;
       const response = await this.provider.generateResponse({
         messages: [{ role: 'user', content: prompt }],
         model: this.config.tier3Model,
-        temperature: 0.2,
+        temperature: this.config.temperature,
         maxTokens: 8192,
       });
 
@@ -721,6 +739,7 @@ Return an empty array [] if none are relevant.`;
 
 /**
  * Quick function to get relevant entries without a full service instance.
+ * Uses settings from the settings store for configuration.
  */
 export async function getRelevantEntries(
   entries: Entry[],
@@ -730,7 +749,8 @@ export async function getRelevantEntries(
   liveState?: LiveWorldState,
   activationTracker?: ActivationTracker
 ): Promise<EntryRetrievalResult> {
-  const service = new EntryRetrievalService(provider || null);
+  const config = getEntryRetrievalConfigFromSettings();
+  const service = new EntryRetrievalService(provider || null, config);
   return service.getRelevantEntries(entries, userInput, recentStoryEntries, liveState, activationTracker);
 }
 

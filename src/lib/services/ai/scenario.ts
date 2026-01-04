@@ -1,4 +1,4 @@
-import { settings, DEFAULT_OPENROUTER_PROFILE_ID } from '$lib/stores/settings.svelte';
+import { settings, DEFAULT_OPENROUTER_PROFILE_ID, DEFAULT_NANOGPT_PROFILE_ID, type ProviderPreset } from '$lib/stores/settings.svelte';
 import { OpenAIProvider, OPENROUTER_API_URL } from './openrouter';
 import type { Message } from './types';
 import type { StoryMode, POV, Character, Location, Item } from '$lib/types';
@@ -179,6 +179,53 @@ export function getDefaultAdvancedSettings(): AdvancedWizardSettings {
       profileId: DEFAULT_OPENROUTER_PROFILE_ID,
       model: 'z-ai/glm-4.7', // GLM-4.7 with z-ai provider for opening generation
       systemPrompt: '', // Empty = use mode-specific prompts (adventure vs creative-writing)
+      temperature: 0.8,
+      topP: 0.95,
+      maxTokens: 8192,
+    },
+  };
+}
+
+export function getDefaultAdvancedSettingsForProvider(provider: ProviderPreset): AdvancedWizardSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // NanoGPT uses zai-org/ prefix and :thinking suffix for opening generation
+  const openingModel = provider === 'nanogpt' ? 'zai-org/glm-4.7:thinking' : 'z-ai/glm-4.7';
+  return {
+    settingExpansion: {
+      profileId,
+      model: 'deepseek/deepseek-v3.2',
+      systemPrompt: DEFAULT_PROMPTS.settingExpansion,
+      temperature: 0.3,
+      topP: 0.95,
+      maxTokens: 8192,
+    },
+    protagonistGeneration: {
+      profileId,
+      model: 'deepseek/deepseek-v3.2',
+      systemPrompt: DEFAULT_PROMPTS.protagonistGeneration,
+      temperature: 0.3,
+      topP: 0.95,
+      maxTokens: 8192,
+    },
+    characterElaboration: {
+      profileId,
+      model: 'deepseek/deepseek-v3.2',
+      systemPrompt: DEFAULT_PROMPTS.characterElaboration,
+      temperature: 0.3,
+      topP: 0.95,
+      maxTokens: 8192,
+    },
+    supportingCharacters: {
+      profileId,
+      model: SCENARIO_MODEL,
+      systemPrompt: DEFAULT_PROMPTS.supportingCharacters,
+      temperature: 0.3,
+      maxTokens: 8192,
+    },
+    openingGeneration: {
+      profileId,
+      model: openingModel,
+      systemPrompt: '',
       temperature: 0.8,
       topP: 0.95,
       maxTokens: 8192,

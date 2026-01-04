@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { settings, DEFAULT_OPENROUTER_PROFILE_ID } from '$lib/stores/settings.svelte';
+  import { settings } from '$lib/stores/settings.svelte';
   import type { APIProfile } from '$lib/types';
   import { X, Plus, Trash2, RefreshCw, Check, AlertCircle } from 'lucide-svelte';
   import { ask } from '@tauri-apps/plugin-dialog';
 
   // Check if the current profile can be deleted
   let canDelete = $derived(editingProfile ? settings.canDeleteProfile(editingProfile.id) : false);
-  let isDefaultProfile = $derived(editingProfile?.id === DEFAULT_OPENROUTER_PROFILE_ID);
+  let isDefaultProfile = $derived(editingProfile?.id === settings.getDefaultProfileIdForProvider());
 
   interface Props {
     isOpen: boolean;

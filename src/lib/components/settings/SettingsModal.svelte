@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ui } from '$lib/stores/ui.svelte';
-  import { settings, DEFAULT_SERVICE_PROMPTS, DEFAULT_OPENROUTER_PROFILE_ID } from '$lib/stores/settings.svelte';
+  import { settings, DEFAULT_SERVICE_PROMPTS } from '$lib/stores/settings.svelte';
   import { OpenAIProvider, OPENROUTER_API_URL } from '$lib/services/ai/openrouter';
   import type { ThemeId } from '$lib/types';
   import {
@@ -24,6 +24,7 @@
   let showMemorySection = $state(false);
   let showSuggestionsSection = $state(false);
   let showStyleReviewerSection = $state(false);
+  let showEntryRetrievalSection = $state(false);
   let showTimelineFillSection = $state(false);
   let editingStoryPrompt = $state<'adventure' | 'creativeWriting' | null>(null);
   let editingProcess = $state<keyof AdvancedWizardSettings | null>(null);
@@ -340,7 +341,7 @@
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                       <span class="font-medium text-surface-200 truncate">{profile.name}</span>
-                      {#if profile.id === DEFAULT_OPENROUTER_PROFILE_ID}
+                      {#if profile.id === settings.getDefaultProfileIdForProvider()}
                         <span class="text-xs bg-accent-600/20 text-accent-400 px-1.5 py-0.5 rounded">Default</span>
                       {/if}
                     </div>
@@ -384,7 +385,7 @@
               {#each settings.apiSettings.profiles as profile (profile.id)}
                 <option value={profile.id}>
                   {profile.name}
-                  {#if profile.id === DEFAULT_OPENROUTER_PROFILE_ID} (Default){/if}
+                  {#if profile.id === settings.getDefaultProfileIdForProvider()} (Default){/if}
                 </option>
               {/each}
             </select>
@@ -1591,6 +1592,120 @@
                       {settings.systemServicesSettings.styleReviewer.systemPrompt.slice(0, 100)}...
                     </p>
                   {/if}
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Lorebook Retrieval Section -->
+          <div class="border-t border-surface-700 pt-3">
+            <div class="flex items-center justify-between">
+              <button
+                class="flex items-center gap-2 text-left flex-1"
+                onclick={() => showEntryRetrievalSection = !showEntryRetrievalSection}
+              >
+                <Search class="h-4 w-4 text-emerald-400" />
+                <div>
+                  <h3 class="text-sm font-medium text-surface-200">Lorebook Retrieval</h3>
+                  <p class="text-xs text-surface-500">Tiered lorebook entry selection (fast model recommended)</p>
+                </div>
+              </button>
+              <div class="flex items-center gap-2">
+                <!-- Enable/Disable Tier 3 LLM Selection -->
+                <button
+                  class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+                  class:bg-accent-600={settings.systemServicesSettings.entryRetrieval.enableLLMSelection}
+                  class:bg-surface-600={!settings.systemServicesSettings.entryRetrieval.enableLLMSelection}
+                  onclick={async () => {
+                    settings.systemServicesSettings.entryRetrieval.enableLLMSelection =
+                      !settings.systemServicesSettings.entryRetrieval.enableLLMSelection;
+                    await settings.saveSystemServicesSettings();
+                  }}
+                  aria-label="Toggle Tier 3 LLM selection"
+                >
+                  <span
+                    class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform"
+                    class:translate-x-5={settings.systemServicesSettings.entryRetrieval.enableLLMSelection}
+                    class:translate-x-1={!settings.systemServicesSettings.entryRetrieval.enableLLMSelection}
+                  ></span>
+                </button>
+                <button
+                  class="text-xs text-accent-400 hover:text-accent-300 flex items-center gap-1"
+                  onclick={() => settings.resetEntryRetrievalSettings()}
+                >
+                  <RotateCcw class="h-3 w-3" />
+                  Reset
+                </button>
+                <button onclick={() => showEntryRetrievalSection = !showEntryRetrievalSection}>
+                  {#if showEntryRetrievalSection}
+                    <ChevronUp class="h-4 w-4 text-surface-400" />
+                  {:else}
+                    <ChevronDown class="h-4 w-4 text-surface-400" />
+                  {/if}
+                </button>
+              </div>
+            </div>
+
+            {#if showEntryRetrievalSection}
+              <div class="mt-3 space-y-3">
+                <div class="card bg-surface-900 p-3">
+                  <p class="text-xs text-surface-400 mb-3">
+                    Uses a lightweight model to select contextually relevant lorebook entries
+                    that did not match keywords (Tier 3). Tier 1 and Tier 2 still run regardless.
+                  </p>
+
+                  <!-- Profile and Model Selector -->
+                  <div class="mb-3">
+                    <ModelSelector
+                      profileId={settings.systemServicesSettings.entryRetrieval.profileId}
+                      model={settings.systemServicesSettings.entryRetrieval.model}
+                      onProfileChange={(id) => {
+                        settings.systemServicesSettings.entryRetrieval.profileId = id;
+                        settings.saveSystemServicesSettings();
+                      }}
+                      onModelChange={(m) => {
+                        settings.systemServicesSettings.entryRetrieval.model = m;
+                        settings.saveSystemServicesSettings();
+                      }}
+                      onManageProfiles={() => { showProfileModal = true; editingProfile = null; }}
+                    />
+                  </div>
+
+                  <!-- Temperature -->
+                  <div class="mb-3">
+                    <label class="mb-1 block text-xs font-medium text-surface-400">
+                      Temperature: {settings.systemServicesSettings.entryRetrieval.temperature.toFixed(2)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      bind:value={settings.systemServicesSettings.entryRetrieval.temperature}
+                      onchange={() => settings.saveSystemServicesSettings()}
+                      class="w-full h-2"
+                    />
+                  </div>
+
+                  <!-- Max Tier 3 Entries -->
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-surface-400">
+                      Max Tier 3 Entries: {settings.systemServicesSettings.entryRetrieval.maxTier3Entries === 0 ? 'Unlimited' : settings.systemServicesSettings.entryRetrieval.maxTier3Entries}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="50"
+                      step="1"
+                      bind:value={settings.systemServicesSettings.entryRetrieval.maxTier3Entries}
+                      onchange={() => settings.saveSystemServicesSettings()}
+                      class="w-full h-2"
+                    />
+                    <div class="flex justify-between text-xs text-surface-500">
+                      <span>0 = unlimited</span>
+                      <span>50 max</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             {/if}

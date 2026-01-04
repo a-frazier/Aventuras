@@ -3,11 +3,20 @@ import { database } from '$lib/services/database';
 import {
   type AdvancedWizardSettings,
   getDefaultAdvancedSettings,
+  getDefaultAdvancedSettingsForProvider,
 } from '$lib/services/ai/scenario';
 import { OPENROUTER_API_URL } from '$lib/services/ai/openrouter';
 
-// Default OpenRouter profile ID - constant so it's always consistent
+// Provider preset types
+// 'custom' uses OpenRouter defaults but allows user to configure their own API endpoint
+export type ProviderPreset = 'openrouter' | 'nanogpt' | 'custom';
+
+// Default profile IDs for each provider
 export const DEFAULT_OPENROUTER_PROFILE_ID = 'default-openrouter-profile';
+export const DEFAULT_NANOGPT_PROFILE_ID = 'default-nanogpt-profile';
+
+// Provider URLs
+export const NANOGPT_API_URL = 'https://nano-gpt.com/api/v1';
 
 // Default system prompts for story generation
 export const DEFAULT_STORY_PROMPTS = {
@@ -356,6 +365,19 @@ export function getDefaultClassifierSettings(): ClassifierSettings {
   };
 }
 
+export function getDefaultClassifierSettingsForProvider(provider: ProviderPreset): ClassifierSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // NanoGPT: Use Deepseek v3.2 without thinking (per user request)
+  const model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4-fast';
+  return {
+    profileId,
+    model,
+    temperature: 0.3,
+    maxTokens: 8192,
+    systemPrompt: DEFAULT_SERVICE_PROMPTS.classifier,
+  };
+}
+
 // Lorebook Import Classifier settings (classifies imported lorebook entries by type)
 export interface LorebookClassifierSettings {
   profileId: string | null;  // API profile to use (null = use main narrative profile)
@@ -373,6 +395,20 @@ export function getDefaultLorebookClassifierSettings(): LorebookClassifierSettin
   return {
     profileId: null,  // null = use main narrative profile
     model: 'x-ai/grok-4.1-fast',
+    temperature: 0.1,
+    maxTokens: 8192,
+    systemPrompt: DEFAULT_LOREBOOK_CLASSIFIER_PROMPT,
+    batchSize: 50,
+    maxConcurrent: 5,
+  };
+}
+
+export function getDefaultLorebookClassifierSettingsForProvider(provider: ProviderPreset): LorebookClassifierSettings {
+  // NanoGPT: Use Deepseek v3.2 without thinking (per user request)
+  const model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+  return {
+    profileId: null,  // null = use main narrative profile
+    model,
     temperature: 0.1,
     maxTokens: 8192,
     systemPrompt: DEFAULT_LOREBOOK_CLASSIFIER_PROMPT,
@@ -402,6 +438,20 @@ export function getDefaultMemorySettings(): MemorySettings {
   };
 }
 
+export function getDefaultMemorySettingsForProvider(provider: ProviderPreset): MemorySettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // NanoGPT: Use Deepseek v3.2 without thinking (per user request)
+  const model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+  return {
+    profileId,
+    model,
+    temperature: 0.3,
+    chapterAnalysisPrompt: DEFAULT_SERVICE_PROMPTS.chapterAnalysis,
+    chapterSummarizationPrompt: DEFAULT_SERVICE_PROMPTS.chapterSummarization,
+    retrievalDecisionPrompt: DEFAULT_SERVICE_PROMPTS.retrievalDecision,
+  };
+}
+
 // Suggestions service settings
 export interface SuggestionsSettings {
   profileId: string | null;  // API profile to use (null = use default profile)
@@ -414,6 +464,18 @@ export interface SuggestionsSettings {
 export function getDefaultSuggestionsSettings(): SuggestionsSettings {
   return {
     profileId: DEFAULT_OPENROUTER_PROFILE_ID,
+    model: 'deepseek/deepseek-v3.2',
+    temperature: 0.7,
+    maxTokens: 8192,
+    systemPrompt: DEFAULT_SERVICE_PROMPTS.suggestions,
+  };
+}
+
+export function getDefaultSuggestionsSettingsForProvider(provider: ProviderPreset): SuggestionsSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // Same model for both - deepseek doesn't have thinking in either provider by default
+  return {
+    profileId,
     model: 'deepseek/deepseek-v3.2',
     temperature: 0.7,
     maxTokens: 8192,
@@ -437,6 +499,21 @@ export function getDefaultStyleReviewerSettings(): StyleReviewerSettings {
     profileId: DEFAULT_OPENROUTER_PROFILE_ID,
     enabled: true, // Enabled by default per requirements
     model: 'x-ai/grok-4.1-fast',
+    temperature: 0.3,
+    maxTokens: 8192,
+    triggerInterval: 5,
+    systemPrompt: DEFAULT_SERVICE_PROMPTS.styleReviewer,
+  };
+}
+
+export function getDefaultStyleReviewerSettingsForProvider(provider: ProviderPreset): StyleReviewerSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // NanoGPT: Use Deepseek v3.2 without thinking (per user request)
+  const model = provider === 'nanogpt' ? 'deepseek/deepseek-v3.2' : 'x-ai/grok-4.1-fast';
+  return {
+    profileId,
+    enabled: true,
+    model,
     temperature: 0.3,
     maxTokens: 8192,
     triggerInterval: 5,
@@ -474,6 +551,18 @@ export function getDefaultLoreManagementSettings(): LoreManagementSettings {
   return {
     profileId: DEFAULT_OPENROUTER_PROFILE_ID,
     model: 'minimax/minimax-m2.1', // Good for agentic tool calling with reasoning
+    temperature: 0.3,
+    maxIterations: 50,
+    systemPrompt: DEFAULT_LORE_MANAGEMENT_PROMPT,
+  };
+}
+
+export function getDefaultLoreManagementSettingsForProvider(provider: ProviderPreset): LoreManagementSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // minimax has built-in reasoning, same for both providers
+  return {
+    profileId,
+    model: 'minimax/minimax-m2.1',
     temperature: 0.3,
     maxIterations: 50,
     systemPrompt: DEFAULT_LORE_MANAGEMENT_PROMPT,
@@ -519,6 +608,20 @@ export function getDefaultAgenticRetrievalSettings(): AgenticRetrievalSettings {
   };
 }
 
+export function getDefaultAgenticRetrievalSettingsForProvider(provider: ProviderPreset): AgenticRetrievalSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // minimax has built-in reasoning, same for both providers
+  return {
+    profileId,
+    enabled: false,
+    model: 'minimax/minimax-m2.1',
+    temperature: 0.3,
+    maxIterations: 30,
+    systemPrompt: DEFAULT_AGENTIC_RETRIEVAL_PROMPT,
+    agenticThreshold: 30,
+  };
+}
+
 // Timeline Fill service settings (per design doc section 3.1.4: Static Retrieval)
 export interface TimelineFillSettings {
   profileId: string | null;  // API profile to use (null = use default profile)
@@ -544,6 +647,56 @@ export function getDefaultTimelineFillSettings(): TimelineFillSettings {
   };
 }
 
+export function getDefaultTimelineFillSettingsForProvider(provider: ProviderPreset): TimelineFillSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // NanoGPT: Use mimo-v2-flash-thinking for timeline fill (query generation and answering)
+  const model = provider === 'nanogpt' ? 'xiaomi/mimo-v2-flash-thinking' : 'x-ai/grok-4.1-fast';
+  const temperature = provider === 'nanogpt' ? 0.8 : 0.3;
+  return {
+    profileId,
+    enabled: true,
+    mode: 'static',
+    model,
+    temperature,
+    maxQueries: 5,
+    systemPrompt: DEFAULT_SERVICE_PROMPTS.timelineFill,
+    queryAnswerPrompt: DEFAULT_SERVICE_PROMPTS.timelineFillAnswer,
+  };
+}
+
+// Entry Retrieval settings (Tier 3 LLM selection for lorebook entries)
+export interface EntryRetrievalSettings {
+  profileId: string | null;  // API profile to use (null = use default profile)
+  model: string;
+  temperature: number;
+  maxTier3Entries: number;  // 0 = unlimited
+  enableLLMSelection: boolean;
+}
+
+export function getDefaultEntryRetrievalSettings(): EntryRetrievalSettings {
+  return {
+    profileId: DEFAULT_OPENROUTER_PROFILE_ID,
+    model: 'x-ai/grok-4.1-fast',
+    temperature: 0.2,
+    maxTier3Entries: 0,
+    enableLLMSelection: true,
+  };
+}
+
+export function getDefaultEntryRetrievalSettingsForProvider(provider: ProviderPreset): EntryRetrievalSettings {
+  const profileId = provider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  // NanoGPT: Use mimo-v2-flash-thinking for lorebook retrieval
+  const model = provider === 'nanogpt' ? 'xiaomi/mimo-v2-flash-thinking' : 'x-ai/grok-4.1-fast';
+  const temperature = provider === 'nanogpt' ? 0.8 : 0.2;
+  return {
+    profileId,
+    model,
+    temperature,
+    maxTier3Entries: 0,
+    enableLLMSelection: true,
+  };
+}
+
 // Update settings
 export function getDefaultUpdateSettings(): UpdateSettings {
   return {
@@ -564,6 +717,7 @@ export interface SystemServicesSettings {
   loreManagement: LoreManagementSettings;
   agenticRetrieval: AgenticRetrievalSettings;
   timelineFill: TimelineFillSettings;
+  entryRetrieval: EntryRetrievalSettings;
 }
 
 export function getDefaultSystemServicesSettings(): SystemServicesSettings {
@@ -576,11 +730,32 @@ export function getDefaultSystemServicesSettings(): SystemServicesSettings {
     loreManagement: getDefaultLoreManagementSettings(),
     agenticRetrieval: getDefaultAgenticRetrievalSettings(),
     timelineFill: getDefaultTimelineFillSettings(),
+    entryRetrieval: getDefaultEntryRetrievalSettings(),
+  };
+}
+
+export function getDefaultSystemServicesSettingsForProvider(provider: ProviderPreset): SystemServicesSettings {
+  return {
+    classifier: getDefaultClassifierSettingsForProvider(provider),
+    lorebookClassifier: getDefaultLorebookClassifierSettingsForProvider(provider),
+    memory: getDefaultMemorySettingsForProvider(provider),
+    suggestions: getDefaultSuggestionsSettingsForProvider(provider),
+    styleReviewer: getDefaultStyleReviewerSettingsForProvider(provider),
+    loreManagement: getDefaultLoreManagementSettingsForProvider(provider),
+    agenticRetrieval: getDefaultAgenticRetrievalSettingsForProvider(provider),
+    timelineFill: getDefaultTimelineFillSettingsForProvider(provider),
+    entryRetrieval: getDefaultEntryRetrievalSettingsForProvider(provider),
   };
 }
 
 // Settings Store using Svelte 5 runes
 class SettingsStore {
+  // Provider preset - which provider's defaults to use
+  providerPreset = $state<ProviderPreset>('openrouter');
+
+  // First-run detection - true if user has completed initial setup
+  firstRunComplete = $state(false);
+
   apiSettings = $state<APISettings>({
     openaiApiKey: null,
     openaiApiURL: OPENROUTER_API_URL,
@@ -665,6 +840,29 @@ class SettingsStore {
         this.apiSettings.mainNarrativeProfileId = DEFAULT_OPENROUTER_PROFILE_ID;
       }
 
+      // Load provider preset (which provider's defaults to use)
+      const providerPreset = await database.getSetting('provider_preset');
+      if (providerPreset) {
+        this.providerPreset = providerPreset as ProviderPreset;
+      }
+
+      // Load first-run status
+      const firstRunComplete = await database.getSetting('first_run_complete');
+      if (firstRunComplete === 'true') {
+        this.firstRunComplete = true;
+      } else {
+        // Migration: Check if this is an existing user (has API key or profiles)
+        // If so, mark first run as complete and default to OpenRouter
+        const hasExistingSetup = apiKey || (this.apiSettings.profiles && this.apiSettings.profiles.length > 0);
+        if (hasExistingSetup) {
+          this.firstRunComplete = true;
+          this.providerPreset = 'openrouter'; // Default existing users to OpenRouter
+          await database.setSetting('first_run_complete', 'true');
+          await database.setSetting('provider_preset', 'openrouter');
+          console.log('[Settings] Existing user detected, marking first run complete');
+        }
+      }
+
       // Load UI settings
       const theme = await database.getSetting('theme');
       const fontSize = await database.getSetting('font_size');
@@ -732,6 +930,7 @@ class SettingsStore {
             loreManagement: { ...defaults.loreManagement, ...loaded.loreManagement },
             agenticRetrieval: { ...defaults.agenticRetrieval, ...loaded.agenticRetrieval },
             timelineFill: { ...defaults.timelineFill, ...loaded.timelineFill },
+            entryRetrieval: { ...defaults.entryRetrieval, ...loaded.entryRetrieval },
           };
         } catch {
           this.systemServicesSettings = getDefaultSystemServicesSettings();
@@ -750,11 +949,22 @@ class SettingsStore {
         }
       }
 
-      // Ensure default OpenRouter profile exists (migration for new/existing users)
-      await this.ensureDefaultOpenRouterProfile(apiKey || null);
+      // Only ensure default profile and migrate for existing users (who have completed first run)
+      // New users will get their profile created in initializeWithProvider after selecting a provider
+      if (this.firstRunComplete) {
+        const isOpenRouterUrl = apiURL === OPENROUTER_API_URL;
+        const isOpenRouterKey = !!apiKey && apiKey.startsWith('sk-or-');
+        const shouldEnsureOpenRouterProfile = this.providerPreset === 'openrouter' || isOpenRouterUrl || isOpenRouterKey;
+        const openRouterApiKey = (isOpenRouterUrl || isOpenRouterKey) ? apiKey : null;
 
-      // Migrate null profileIds to default OpenRouter profile
-      await this.migrateNullProfileIds();
+        // Ensure default OpenRouter profile exists (migration for existing OpenRouter users)
+        if (shouldEnsureOpenRouterProfile) {
+          await this.ensureDefaultOpenRouterProfile(openRouterApiKey || null);
+        }
+
+        // Migrate null profileIds to default OpenRouter profile
+        await this.migrateNullProfileIds();
+      }
 
       this.initialized = true;
     } catch (error) {
@@ -825,9 +1035,10 @@ class SettingsStore {
   }
 
   async deleteProfile(id: string) {
-    // Prevent deleting the default OpenRouter profile
-    if (id === DEFAULT_OPENROUTER_PROFILE_ID) {
-      console.warn('[Settings] Cannot delete the default OpenRouter profile');
+    // Prevent deleting the default profile for the current provider
+    const defaultProfileId = this.getDefaultProfileIdForProvider();
+    if (id === defaultProfileId) {
+      console.warn('[Settings] Cannot delete the default profile');
       return false;
     }
 
@@ -835,11 +1046,18 @@ class SettingsStore {
 
     // If deleted profile was active, switch to default profile
     if (this.apiSettings.activeProfileId === id) {
-      this.apiSettings.activeProfileId = DEFAULT_OPENROUTER_PROFILE_ID;
-      const defaultProfile = this.getDefaultProfile();
+      const defaultProfile = this.getProfile(defaultProfileId);
       if (defaultProfile) {
+        this.apiSettings.activeProfileId = defaultProfileId;
         this.apiSettings.openaiApiURL = defaultProfile.baseUrl;
         this.apiSettings.openaiApiKey = defaultProfile.apiKey;
+      } else if (this.apiSettings.profiles.length > 0) {
+        const fallbackProfile = this.apiSettings.profiles[0];
+        this.apiSettings.activeProfileId = fallbackProfile.id;
+        this.apiSettings.openaiApiURL = fallbackProfile.baseUrl;
+        this.apiSettings.openaiApiKey = fallbackProfile.apiKey;
+      } else {
+        this.apiSettings.activeProfileId = null;
       }
     }
 
@@ -851,7 +1069,7 @@ class SettingsStore {
    * Check if a profile can be deleted (not the default profile)
    */
   canDeleteProfile(id: string): boolean {
-    return id !== DEFAULT_OPENROUTER_PROFILE_ID;
+    return id !== this.getDefaultProfileIdForProvider();
   }
 
   /**
@@ -885,7 +1103,7 @@ class SettingsStore {
   getApiSettingsForProfile(profileId: string): APISettings {
     const profile = this.getProfile(profileId);
     if (!profile) {
-      // Fall back to default OpenRouter profile
+      // Fall back to the default profile for the current provider
       const defaultProfile = this.getDefaultProfile();
       if (defaultProfile) {
         return {
@@ -966,6 +1184,11 @@ class SettingsStore {
     // Timeline Fill
     if (this.systemServicesSettings.timelineFill.model) {
       models.add(this.systemServicesSettings.timelineFill.model);
+    }
+
+    // Entry Retrieval (Tier 3 selection)
+    if (this.systemServicesSettings.entryRetrieval.model) {
+      models.add(this.systemServicesSettings.entryRetrieval.model);
     }
 
     // Wizard settings
@@ -1101,6 +1324,10 @@ class SettingsStore {
       this.systemServicesSettings.timelineFill.profileId = DEFAULT_OPENROUTER_PROFILE_ID;
       needsSave = true;
     }
+    if (needsMigration(this.systemServicesSettings.entryRetrieval.profileId)) {
+      this.systemServicesSettings.entryRetrieval.profileId = DEFAULT_OPENROUTER_PROFILE_ID;
+      needsSave = true;
+    }
 
     if (needsSave) {
       await this.saveSystemServicesSettings();
@@ -1123,10 +1350,13 @@ class SettingsStore {
   }
 
   /**
-   * Get the default OpenRouter profile (always exists after init)
+   * Get the default profile for the current provider.
    */
   getDefaultProfile(): APIProfile | undefined {
-    return this.getProfile(DEFAULT_OPENROUTER_PROFILE_ID);
+    const defaultProfileId = this.getDefaultProfileIdForProvider();
+    return this.getProfile(defaultProfileId)
+      ?? this.getProfile(DEFAULT_OPENROUTER_PROFILE_ID)
+      ?? this.apiSettings.profiles[0];
   }
 
   /**
@@ -1189,13 +1419,13 @@ class SettingsStore {
   }
 
   async resetWizardProcess(process: keyof AdvancedWizardSettings) {
-    const defaults = getDefaultAdvancedSettings();
+    const defaults = getDefaultAdvancedSettingsForProvider(this.getEffectiveProvider());
     this.wizardSettings[process] = { ...defaults[process] };
     await this.saveWizardSettings();
   }
 
   async resetAllWizardSettings() {
-    this.wizardSettings = getDefaultAdvancedSettings();
+    this.wizardSettings = getDefaultAdvancedSettingsForProvider(this.getEffectiveProvider());
     await this.saveWizardSettings();
   }
 
@@ -1215,47 +1445,52 @@ class SettingsStore {
   }
 
   async resetClassifierSettings() {
-    this.systemServicesSettings.classifier = getDefaultClassifierSettings();
+    this.systemServicesSettings.classifier = getDefaultClassifierSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetLorebookClassifierSettings() {
-    this.systemServicesSettings.lorebookClassifier = getDefaultLorebookClassifierSettings();
+    this.systemServicesSettings.lorebookClassifier = getDefaultLorebookClassifierSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetMemorySettings() {
-    this.systemServicesSettings.memory = getDefaultMemorySettings();
+    this.systemServicesSettings.memory = getDefaultMemorySettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetSuggestionsSettings() {
-    this.systemServicesSettings.suggestions = getDefaultSuggestionsSettings();
+    this.systemServicesSettings.suggestions = getDefaultSuggestionsSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetStyleReviewerSettings() {
-    this.systemServicesSettings.styleReviewer = getDefaultStyleReviewerSettings();
+    this.systemServicesSettings.styleReviewer = getDefaultStyleReviewerSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetLoreManagementSettings() {
-    this.systemServicesSettings.loreManagement = getDefaultLoreManagementSettings();
+    this.systemServicesSettings.loreManagement = getDefaultLoreManagementSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetAgenticRetrievalSettings() {
-    this.systemServicesSettings.agenticRetrieval = getDefaultAgenticRetrievalSettings();
+    this.systemServicesSettings.agenticRetrieval = getDefaultAgenticRetrievalSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetTimelineFillSettings() {
-    this.systemServicesSettings.timelineFill = getDefaultTimelineFillSettings();
+    this.systemServicesSettings.timelineFill = getDefaultTimelineFillSettingsForProvider(this.getEffectiveProvider());
+    await this.saveSystemServicesSettings();
+  }
+
+  async resetEntryRetrievalSettings() {
+    this.systemServicesSettings.entryRetrieval = getDefaultEntryRetrievalSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
   async resetAllSystemServicesSettings() {
-    this.systemServicesSettings = getDefaultSystemServicesSettings();
+    this.systemServicesSettings = getDefaultSystemServicesSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
@@ -1290,15 +1525,24 @@ class SettingsStore {
   }
 
   /**
-   * Reset ALL settings to their default values.
+   * Reset ALL settings to their default values based on the current provider preset.
    * This preserves the API key and URL but resets everything else.
    */
   async resetAllSettings(preserveApiSettings = true) {
+    const provider = this.providerPreset;
+    // 'custom' uses OpenRouter defaults
+    const effectiveProvider = provider === 'custom' ? 'openrouter' : provider;
+    const defaultProfileId = effectiveProvider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+    const defaultApiURL = effectiveProvider === 'nanogpt' ? NANOGPT_API_URL : OPENROUTER_API_URL;
+
     const apiKey = preserveApiSettings ? this.apiSettings.openaiApiKey : null;
-    const apiURL = preserveApiSettings ? this.apiSettings.openaiApiURL : OPENROUTER_API_URL;
+    const apiURL = preserveApiSettings ? this.apiSettings.openaiApiURL : defaultApiURL;
     const profiles = preserveApiSettings ? this.apiSettings.profiles : [];
     const activeProfileId = preserveApiSettings ? this.apiSettings.activeProfileId : null;
-    const mainNarrativeProfileId = preserveApiSettings ? this.apiSettings.mainNarrativeProfileId : DEFAULT_OPENROUTER_PROFILE_ID;
+    const mainNarrativeProfileId = preserveApiSettings ? this.apiSettings.mainNarrativeProfileId : defaultProfileId;
+
+    // Provider-specific default model (NanoGPT uses zai-org/ prefix)
+    const defaultNarrativeModel = effectiveProvider === 'nanogpt' ? 'zai-org/glm-4.7' : 'z-ai/glm-4.7';
 
     // Reset API settings (except URL/key/profiles if preserving)
     this.apiSettings = {
@@ -1307,7 +1551,7 @@ class SettingsStore {
       profiles: profiles,
       activeProfileId: activeProfileId,
       mainNarrativeProfileId: mainNarrativeProfileId,
-      defaultModel: 'z-ai/glm-4.7',
+      defaultModel: defaultNarrativeModel,
       temperature: 0.8,
       maxTokens: 8192,
       enableThinking: false,
@@ -1322,14 +1566,14 @@ class SettingsStore {
       spellcheckEnabled: true,
     };
 
-    // Reset wizard settings
-    this.wizardSettings = getDefaultAdvancedSettings();
+    // Reset wizard settings based on provider
+    this.wizardSettings = getDefaultAdvancedSettingsForProvider(effectiveProvider);
 
     // Reset story generation settings
     this.storyGenerationSettings = getDefaultStoryGenerationSettings();
 
-    // Reset system services settings
-    this.systemServicesSettings = getDefaultSystemServicesSettings();
+    // Reset system services settings based on provider
+    this.systemServicesSettings = getDefaultSystemServicesSettingsForProvider(effectiveProvider);
 
     // Reset update settings
     this.updateSettings = getDefaultUpdateSettings();
@@ -1351,6 +1595,106 @@ class SettingsStore {
 
     // Apply theme
     this.applyTheme(this.uiSettings.theme);
+  }
+
+  // Provider preset methods
+  async setProviderPreset(provider: ProviderPreset) {
+    this.providerPreset = provider;
+    await database.setSetting('provider_preset', provider);
+  }
+
+  // First-run methods
+  async setFirstRunComplete(complete: boolean) {
+    this.firstRunComplete = complete;
+    await database.setSetting('first_run_complete', complete.toString());
+  }
+
+  /**
+   * Initialize settings for a new user with a specific provider.
+   * This sets up the default profile and all settings based on the provider.
+   */
+  async initializeWithProvider(provider: ProviderPreset, apiKey: string) {
+    // Set the provider preset
+    this.providerPreset = provider;
+    await database.setSetting('provider_preset', provider);
+
+    // 'custom' uses OpenRouter defaults but with empty API key
+    const effectiveProvider = provider === 'custom' ? 'openrouter' : provider;
+
+    // Create the default profile for the selected provider
+    const defaultProfileId = effectiveProvider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+    const defaultApiURL = effectiveProvider === 'nanogpt' ? NANOGPT_API_URL : OPENROUTER_API_URL;
+    const profileName = provider === 'custom' ? 'Custom API' : (effectiveProvider === 'nanogpt' ? 'NanoGPT' : 'OpenRouter');
+
+    // Models for each provider (NanoGPT uses zai-org/ prefix, OpenRouter uses z-ai/)
+    const defaultModels = effectiveProvider === 'nanogpt'
+      ? ['deepseek/deepseek-v3.2', 'zai-org/glm-4.7', 'zai-org/glm-4.7:thinking', 'xiaomi/mimo-v2-flash-thinking', 'minimax/minimax-m2.1']
+      : ['deepseek/deepseek-v3.2', 'x-ai/grok-4.1-fast', 'x-ai/grok-4-fast', 'z-ai/glm-4.7', 'minimax/minimax-m2.1'];
+
+    const defaultProfile: APIProfile = {
+      id: defaultProfileId,
+      name: profileName,
+      baseUrl: defaultApiURL,
+      apiKey: apiKey, // Will be empty string for 'custom' provider
+      customModels: defaultModels,
+      fetchedModels: [],
+      createdAt: Date.now(),
+    };
+
+    // Check if profile already exists (shouldn't for first run, but just in case)
+    const existingProfileIndex = this.apiSettings.profiles.findIndex(p => p.id === defaultProfileId);
+    if (existingProfileIndex >= 0) {
+      this.apiSettings.profiles[existingProfileIndex] = defaultProfile;
+    } else {
+      this.apiSettings.profiles = [defaultProfile, ...this.apiSettings.profiles];
+    }
+
+    // Set this as the active and main narrative profile
+    this.apiSettings.activeProfileId = defaultProfileId;
+    this.apiSettings.mainNarrativeProfileId = defaultProfileId;
+    this.apiSettings.openaiApiURL = defaultApiURL;
+    this.apiSettings.openaiApiKey = apiKey;
+
+    // Set provider-specific default model (NanoGPT uses zai-org/ prefix)
+    const defaultNarrativeModel = effectiveProvider === 'nanogpt' ? 'zai-org/glm-4.7' : 'z-ai/glm-4.7';
+    this.apiSettings.defaultModel = defaultNarrativeModel;
+    await database.setSetting('default_model', defaultNarrativeModel);
+
+    // Apply provider-specific defaults to system services (use effectiveProvider for defaults)
+    this.systemServicesSettings = getDefaultSystemServicesSettingsForProvider(effectiveProvider);
+
+    // Apply provider-specific defaults to wizard settings
+    this.wizardSettings = getDefaultAdvancedSettingsForProvider(effectiveProvider);
+
+    // Save everything
+    await this.saveProfiles();
+    await database.setSetting('main_narrative_profile_id', defaultProfileId);
+    await database.setSetting('openai_api_url', defaultApiURL);
+    await database.setSetting('openai_api_key', apiKey);
+    await this.saveSystemServicesSettings();
+    await this.saveWizardSettings();
+
+    // Mark first run as complete
+    this.firstRunComplete = true;
+    await database.setSetting('first_run_complete', 'true');
+
+    console.log(`[Settings] Initialized with ${profileName} provider`);
+  }
+
+  /**
+   * Get the default profile ID for the current provider preset.
+   */
+  getDefaultProfileIdForProvider(): string {
+    // 'custom' uses OpenRouter profile
+    const effectiveProvider = this.providerPreset === 'custom' ? 'openrouter' : this.providerPreset;
+    return effectiveProvider === 'nanogpt' ? DEFAULT_NANOGPT_PROFILE_ID : DEFAULT_OPENROUTER_PROFILE_ID;
+  }
+
+  /**
+   * Get the effective provider for defaults (custom uses openrouter defaults).
+   */
+  getEffectiveProvider(): 'openrouter' | 'nanogpt' {
+    return this.providerPreset === 'custom' ? 'openrouter' : this.providerPreset;
   }
 }
 

@@ -10,7 +10,7 @@ import { LoreManagementService, type LoreManagementSettings } from './loreManage
 import { AgenticRetrievalService, type AgenticRetrievalSettings, type AgenticRetrievalResult } from './agenticRetrieval';
 import { TimelineFillService, type TimelineFillSettings, type TimelineFillResult } from './timelineFill';
 import { ContextBuilder, type ContextResult, type ContextConfig, DEFAULT_CONTEXT_CONFIG } from './context';
-import { EntryRetrievalService, type EntryRetrievalResult, type ActivationTracker } from './entryRetrieval';
+import { EntryRetrievalService, getEntryRetrievalConfigFromSettings, type EntryRetrievalResult, type ActivationTracker } from './entryRetrieval';
 import type { Message, GenerationResponse, StreamChunk } from './types';
 import type { Story, StoryEntry, Character, Location, Item, StoryBeat, Chapter, MemoryConfig, Entry, LoreManagementResult } from '$lib/types';
 
@@ -559,14 +559,17 @@ class AIService {
       hasActivationTracker: !!activationTracker,
     });
 
+    const config = getEntryRetrievalConfigFromSettings();
     let provider: OpenAIProvider | null = null;
-    try {
-      provider = this.getProvider();
-    } catch {
-      log('No provider available, skipping Tier 3 LLM selection for entries');
+    if (config.enableLLMSelection) {
+      try {
+        provider = this.getProviderForProfile(settings.systemServicesSettings.entryRetrieval.profileId);
+      } catch {
+        log('No provider available, skipping Tier 3 LLM selection for entries');
+      }
     }
 
-    const entryService = new EntryRetrievalService(provider);
+    const entryService = new EntryRetrievalService(provider, config);
     const result = await entryService.getRelevantEntries(
       entries,
       userInput,
