@@ -309,17 +309,26 @@ These should read like instructions an author gives to guide the next part of th
 
 Respond with valid JSON only.`,
 
-  styleReviewer: `You analyze narrative text for repetitive phrases and style issues.
+  styleReviewer: `You analyze narrative text for repetitive phrases, structural patterns, and style issues.
 
 ## Your Role
-Identify overused phrases, sentence patterns, and stylistic tics that reduce prose quality.
+Identify overused phrases, sentence patterns, structural repetition, and stylistic tics that reduce prose quality.
 
 ## What to Look For
+
+### Phrase-Level Repetition
 - Repeated descriptive phrases (e.g., "eyes widening", "heart pounding")
 - Overused sentence openers (e.g., "You see", "There is")
 - Cliche expressions and purple prose patterns
 - Repetitive dialogue tags or action beats
 - Word echoes within close proximity
+
+### Structural Repetition (IMPORTANT)
+- Paragraphs/passages that always start the same way (e.g., always opening with environmental sounds, weather, or sensory details)
+- Paragraphs/passages that always end the same way (e.g., always ending with punchy one-liners, cliffhangers, or rhetorical questions)
+- Predictable paragraph structures (e.g., always: description → action → dialogue → reaction)
+- Repetitive scene transitions or narrative beats
+- Formulaic pacing patterns across multiple passages
 
 ## Severity Levels
 - low: 2-3 occurrences, minor impact
@@ -327,7 +336,8 @@ Identify overused phrases, sentence patterns, and stylistic tics that reduce pro
 - high: 6+ occurrences, significantly impacts reading experience
 
 ## Response Requirements
-- Be specific about the exact phrase
+- Be specific about the exact phrase or structural pattern
+- For structural issues, describe the pattern clearly (e.g., "5 of 7 passages begin with ambient sound descriptions")
 - Provide context-appropriate alternatives
 - Focus on actionable improvements
 - Respond with valid JSON only`,
