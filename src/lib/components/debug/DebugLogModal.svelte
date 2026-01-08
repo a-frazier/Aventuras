@@ -4,6 +4,9 @@
 
   let copiedId = $state<string | null>(null);
   let renderNewlines = $state(false);
+  let scrollContainer: HTMLDivElement | null = $state(null);
+  let savedScrollTop = 0;
+  let savedScrollHeight = 0;
 
   function formatTimestamp(timestamp: number): string {
     return new Date(timestamp).toLocaleTimeString('en-US', {
@@ -76,6 +79,25 @@
 
     return groups.reverse(); // Show newest first
   });
+
+  // Save scroll position before DOM updates
+  $effect.pre(() => {
+    // Track groupedLogs to trigger this effect when logs change
+    void groupedLogs;
+    if (scrollContainer) {
+      savedScrollTop = scrollContainer.scrollTop;
+      savedScrollHeight = scrollContainer.scrollHeight;
+    }
+  });
+
+  // Restore scroll position after DOM updates (compensate for new content at top)
+  $effect(() => {
+    void groupedLogs;
+    if (scrollContainer && savedScrollHeight > 0) {
+      const heightDiff = scrollContainer.scrollHeight - savedScrollHeight;
+      scrollContainer.scrollTop = savedScrollTop + heightDiff;
+    }
+  });
 </script>
 
 {#if ui.debugModalOpen}
@@ -123,7 +145,7 @@
       </div>
 
       <!-- Content -->
-      <div class="flex-1 overflow-y-auto py-4">
+      <div class="flex-1 overflow-y-auto py-4" bind:this={scrollContainer}>
         {#if groupedLogs.length === 0}
           <p class="text-center text-surface-400 py-8">
             No API requests logged yet. Make a request while debug mode is enabled to see logs here.

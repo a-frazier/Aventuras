@@ -532,7 +532,8 @@
                   story.chapters,
                   timelineResult,
                   currentPosition,
-                  firstVisiblePosition
+                  firstVisiblePosition,
+                  story.locations // Filter to only visited/current locations
                 );
                 log('Timeline fill complete', {
                   queriesGenerated: timelineResult.queries.length,

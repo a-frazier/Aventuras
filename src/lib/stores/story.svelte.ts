@@ -566,6 +566,7 @@ class StoryStore {
 
     // Find entries to delete (position >= the given position)
     const entriesToDelete = this.entries.filter(e => e.position >= position);
+    const entryIdsToDelete = new Set(entriesToDelete.map(e => e.id));
 
     log('Deleting entries from position', {
       position,
@@ -573,7 +574,26 @@ class StoryStore {
       totalEntries: this.entries.length,
     });
 
-    // Delete from database
+    // Find chapters that reference any of the entries being deleted
+    // (chapters have foreign keys to start_entry_id and end_entry_id)
+    const chaptersToDelete = this.chapters.filter(ch =>
+      entryIdsToDelete.has(ch.startEntryId) || entryIdsToDelete.has(ch.endEntryId)
+    );
+
+    if (chaptersToDelete.length > 0) {
+      log('Deleting chapters that reference entries being deleted', {
+        chaptersToDelete: chaptersToDelete.length,
+        chapterNumbers: chaptersToDelete.map(ch => ch.number),
+      });
+
+      // Delete chapters first (to satisfy foreign key constraints)
+      for (const chapter of chaptersToDelete) {
+        await database.deleteChapter(chapter.id);
+      }
+      this.chapters = this.chapters.filter(ch => !chaptersToDelete.some(d => d.id === ch.id));
+    }
+
+    // Now delete entries from database
     for (const entry of entriesToDelete) {
       await database.deleteStoryEntry(entry.id);
     }

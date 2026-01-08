@@ -795,13 +795,15 @@ class AIService {
     chapters: Chapter[],
     result: TimelineFillResult,
     currentEntryPosition: number,
-    firstVisibleEntryPosition: number
+    firstVisibleEntryPosition: number,
+    locations?: Location[]
   ): string {
     return TimelineFillService.formatForPromptInjection(
       chapters,
       result,
       currentEntryPosition,
-      firstVisibleEntryPosition
+      firstVisibleEntryPosition,
+      locations
     );
   }
 

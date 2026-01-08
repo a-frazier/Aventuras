@@ -3,29 +3,25 @@ import type { Chapter, StoryEntry, MemoryConfig, TimeTracker } from '$lib/types'
 import { settings, type MemorySettings } from '$lib/stores/settings.svelte';
 import { buildExtraBody } from './requestOverrides';
 
-// Format time tracker for display in context
+// Format time tracker for display in context (always shows full format)
 function formatTime(time: TimeTracker | null): string {
-  if (!time) return '';
-  const parts: string[] = [];
-  if (time.years > 0) parts.push(`Year ${time.years}`);
-  if (time.days > 0) parts.push(`Day ${time.days}`);
-  const hour = time.hours.toString().padStart(2, '0');
-  const minute = time.minutes.toString().padStart(2, '0');
-  parts.push(`${hour}:${minute}`);
-  return parts.join(', ');
+  // Default to Year 1, Day 1, 00:00 if null
+  const t = time ?? { years: 0, days: 0, hours: 0, minutes: 0 };
+  const year = t.years + 1; // Display as 1-indexed (Year 1 = years: 0)
+  const day = t.days + 1;   // Display as 1-indexed (Day 1 = days: 0)
+  const hour = t.hours.toString().padStart(2, '0');
+  const minute = t.minutes.toString().padStart(2, '0');
+  return `Year ${year}, Day ${day}, ${hour}:${minute}`;
 }
 
 // Format time range for chapter context
 function formatTimeRange(startTime: TimeTracker | null, endTime: TimeTracker | null): string {
   const start = formatTime(startTime);
   const end = formatTime(endTime);
-  if (!start && !end) return '';
-  if (start && end && start !== end) {
+  if (start !== end) {
     return ` [${start} → ${end}]`;
   }
-  if (start) return ` [${start}]`;
-  if (end) return ` [${end}]`;
-  return '';
+  return ` [${start}]`;
 }
 
 const DEBUG = true;

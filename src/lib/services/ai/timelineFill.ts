@@ -1,7 +1,18 @@
 import type { OpenAIProvider as OpenAIProvider } from './openrouter';
-import type { Chapter, StoryEntry } from '$lib/types';
+import type { Chapter, StoryEntry, TimeTracker, Location } from '$lib/types';
 import { settings } from '$lib/stores/settings.svelte';
 import { buildExtraBody } from './requestOverrides';
+
+// Format time tracker for timeline display (always shows full format)
+function formatTime(time: TimeTracker | null): string {
+  // Default to Year 1, Day 1, 00:00 if null
+  const t = time ?? { years: 0, days: 0, hours: 0, minutes: 0 };
+  const year = t.years + 1; // Display as 1-indexed (Year 1 = years: 0)
+  const day = t.days + 1;   // Display as 1-indexed (Day 1 = days: 0)
+  const hour = t.hours.toString().padStart(2, '0');
+  const minute = t.minutes.toString().padStart(2, '0');
+  return `Year ${year}, Day ${day}, ${hour}:${minute}`;
+}
 
 const DEBUG = true;
 
@@ -484,21 +495,38 @@ Provide a concise, factual answer based only on the chapter content above. If th
     chapters: Chapter[],
     result: TimelineFillResult,
     currentEntryPosition: number,
-    firstVisibleEntryPosition: number
+    firstVisibleEntryPosition: number,
+    locations?: Location[]
   ): string {
     if (chapters.length === 0) {
       return '';
     }
 
+    // Build a set of visited/current location names for filtering
+    const visitedLocationNames = new Set(
+      (locations ?? [])
+        .filter(loc => loc.visited || loc.current)
+        .map(loc => loc.name.toLowerCase())
+    );
+
     // Build timeline JSON
-    const timeline = chapters.map(ch => ({
-      chapter_id: ch.number,
-      title: ch.title || `Chapter ${ch.number}`,
-      entry_count: ch.entryCount,
-      summary: ch.summary,
-      characters: ch.characters,
-      locations: ch.locations,
-    }));
+    const timeline = chapters.map(ch => {
+      // Filter chapter locations to only include visited/current ones
+      const filteredLocations = locations
+        ? ch.locations.filter(locName => visitedLocationNames.has(locName.toLowerCase()))
+        : ch.locations;
+
+      return {
+        chapter_id: ch.number,
+        title: ch.title || `Chapter ${ch.number}`,
+        start_time: formatTime(ch.startTime),
+        end_time: formatTime(ch.endTime),
+        entry_count: ch.entryCount,
+        summary: ch.summary,
+        characters: ch.characters,
+        locations: filteredLocations,
+      };
+    });
 
     let block = `
 <timeline>
