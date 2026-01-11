@@ -8,6 +8,8 @@
 import { promptService } from '../prompts';
 import type { OpenAIProvider } from './openrouter';
 import type { Character } from '$lib/types';
+import { buildExtraBody } from './requestOverrides';
+import { settings } from '$lib/stores/settings.svelte';
 
 /**
  * Represents a scene identified as suitable for image generation.
@@ -119,6 +121,14 @@ export class ImagePromptService {
     });
 
     try {
+      const imageSettings = settings.systemServicesSettings.imageGeneration;
+      const extraBody = buildExtraBody({
+        manualMode: settings.advancedRequestSettings.manualMode,
+        manualBody: imageSettings.manualBody,
+        reasoningEffort: this.settings.reasoningEffort ?? 'off',
+        providerOnly: imageSettings.providerOnly,
+      });
+
       const response = await this.provider.generateResponse({
         model: this.settings.model,
         messages: [
@@ -127,6 +137,7 @@ export class ImagePromptService {
         ],
         temperature: this.settings.temperature,
         maxTokens: this.settings.maxTokens,
+        extraBody,
       });
 
       const scenes = this.parseResponse(response.content);
