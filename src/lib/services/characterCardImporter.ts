@@ -11,6 +11,7 @@ import type { Genre, GeneratedCharacter } from '$lib/services/ai/scenario';
 import { OpenAIProvider } from './ai/openrouter';
 import { settings } from '$lib/stores/settings.svelte';
 import { buildExtraBody } from '$lib/services/ai/requestOverrides';
+import { promptService, type PromptContext } from './prompts';
 
 const DEBUG = true;
 
@@ -407,22 +408,19 @@ export async function convertCardToScenario(
     };
   }
 
-  const systemPrompt = cardImportSettings.systemPrompt;
-  const userPrompt = `Clean this character card for use as a ${genre} scenario setting.
+  const context: PromptContext = {
+    mode: 'adventure',
+    pov: 'second',
+    tense: 'present',
+    protagonistName: '{{user}}',
+  };
 
-The {{user}} will be the protagonist (their name will be filled in later) interacting with the NPCs in an interactive story.
-
-IMPORTANT: 
-- Identify who "{{char}}" refers to based on the content (NOT the card title "${cardTitle}")
-- Replace all {{char}} with the actual character name
-- KEEP all {{user}} placeholders as-is (they will be replaced with the player's character name later)
-- Preserve the original text - only REMOVE meta-instructions and roleplay guidelines
-- Do NOT summarize or condense - the output should be nearly as long as the input
-
-## CARD CONTENT
-${cardContext}
-
-Clean the above content. Identify all NPCs, replace {{char}} with the actual name, keep {{user}} as-is, and remove meta-content. Output valid JSON only.`;
+  const systemPrompt = promptService.renderPrompt('character-card-import', context);
+  const userPrompt = promptService.renderUserPrompt('character-card-import', context, {
+    genre,
+    title: cardTitle,
+    cardContent: cardContext,
+  });
 
   log('Sending to LLM for conversion...');
 

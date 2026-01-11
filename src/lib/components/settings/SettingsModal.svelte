@@ -2100,21 +2100,24 @@
 
                       <!-- System Prompt -->
                       <div class="rounded-lg border border-surface-700 bg-surface-900/40 p-3">
-                        <div class="mb-2">
-                          <label class="text-xs font-medium text-surface-400">System Prompt</label>
-                          <p class="text-xs text-surface-500">
-                            The prompt used to clean and convert SillyTavern character cards.
-                          </p>
+                        <div class="flex items-center justify-between gap-4">
+                          <div class="flex-1">
+                            <label class="text-xs font-medium text-surface-400">System Prompt</label>
+                            <p class="text-xs text-surface-500 mt-0.5">
+                              Configure the cleaning and conversion prompt in the Prompts tab under Wizard Templates.
+                            </p>
+                          </div>
+                          <button
+                            class="btn btn-secondary text-xs shrink-0"
+                            onclick={() => {
+                              activeTab = 'prompts';
+                              promptsCategory = 'wizard';
+                              selectedTemplateId = 'character-card-import';
+                            }}
+                          >
+                            Go to Prompts
+                          </button>
                         </div>
-                        <textarea
-                          value={settings.systemServicesSettings.characterCardImport.systemPrompt}
-                          oninput={(e) => {
-                            settings.systemServicesSettings.characterCardImport.systemPrompt = e.currentTarget.value;
-                          }}
-                          onblur={() => settings.saveSystemServicesSettings()}
-                          class="input text-xs min-h-[200px] resize-y font-mono w-full"
-                          rows="10"
-                        ></textarea>
                       </div>
                     </div>
                   {:else}
