@@ -912,6 +912,112 @@ export function getDefaultImageGenerationSettingsForProvider(provider: ProviderP
   };
 }
 
+// Character Card Import settings (SillyTavern card conversion)
+export interface CharacterCardImportSettings {
+  profileId: string | null;  // API profile to use (null = use main narrative profile)
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+  reasoningEffort: ReasoningEffort;
+  providerOnly: string[];
+  manualBody: string;
+}
+
+export const DEFAULT_CHARACTER_CARD_IMPORT_PROMPT = `You are cleaning a SillyTavern character card for use as a scenario setting in interactive fiction.
+
+## Your Task
+1. IDENTIFY who "{{char}}" refers to based on the content (the actual character name - NOT the card title)
+2. IDENTIFY ALL NPCs/characters mentioned in the card content
+3. REPLACE all instances of "{{char}}" with the actual character name in your output
+4. KEEP all instances of "{{user}}" as-is - this placeholder will be replaced with the player's character name later
+5. REMOVE specific meta-content patterns (see below)
+6. PRESERVE the original text as much as possible - do NOT summarize or condense
+
+The "{{user}}" refers to the player's character (protagonist). Characters identified from the card will become NPCs.
+
+## REMOVE THESE PATTERNS (delete entirely):
+
+### Roleplay Instructions (DELETE):
+- "You are {{char}}", "You will portray...", "Play as..."
+- "Do not speak for {{user}}", "Never speak for {{user}}"
+- "Stay in character", "Never break character"
+- "Always respond as...", "You must..."
+- Any instruction telling the AI HOW to behave
+
+### Meta-Content (DELETE):
+- HTML comments: <!-- ... -->
+- OOC markers: "(OOC:", "[Author's note:", "[A/N:", etc.
+- System prompts, jailbreaks, NSFW toggles
+- Format instructions: "Use asterisks for actions", "Write in third person", "Use markdown"
+- Section headers like "=== Narration ===" or "=== Character Embodiment ==="
+- Guidelines about writing style, vocabulary, pacing
+
+### Example Dialogue Format (EXTRACT LORE ONLY):
+- Remove the dialogue format itself
+- Keep any world-building or lore mentioned within dialogues
+
+## CONVERT TO NATURAL PROSE (don't delete):
+
+### PList Syntax → Natural Prose:
+- [Character: trait1, trait2; clothes: x] → "CharacterName is trait1 and trait2. She wears x."
+- Keep ALL the information, just convert the bracket format to sentences
+
+## PRESERVE VERBATIM:
+- World descriptions, locations, atmosphere
+- Character appearance (physical details, clothing, etc.)
+- Character personality and behavior patterns
+- Backstory and history
+- Relationship dynamics
+- Scenario/situation setup
+- Any lore, world rules, or setting details
+- All {{user}} placeholders (keep them exactly as {{user}})
+
+## OUTPUT FORMAT
+Respond with valid JSON only (no markdown code blocks):
+{
+  "primaryCharacterName": "The ACTUAL name of the main character that {{char}} refers to",
+  "settingSeed": "The FULL cleaned text with {{char}} replaced by the actual name, but {{user}} kept as-is. This should be LONG - include ALL world-building, character details, and scenario setup. Only meta-instructions should be removed.",
+  "npcs": [
+    {
+      "name": "Character's actual name",
+      "role": "their role (e.g., 'ally', 'mentor', 'antagonist', 'love interest', 'guide', 'friend')",
+      "description": "1-2 sentences: who they are and key appearance details",
+      "personality": "key personality traits as comma-separated list",
+      "relationship": "their relationship to {{user}}"
+    }
+  ]
+}
+
+Note: Include ALL significant characters mentioned in the card as NPCs. The primary character ({{char}}) should be the first NPC in the array.`;
+
+export function getDefaultCharacterCardImportSettings(): CharacterCardImportSettings {
+  return {
+    profileId: null,  // null = use main narrative profile
+    model: 'deepseek/deepseek-v3.2',
+    temperature: 0.3,
+    maxTokens: 16384,
+    systemPrompt: DEFAULT_CHARACTER_CARD_IMPORT_PROMPT,
+    reasoningEffort: 'off',
+    providerOnly: [],
+    manualBody: '',
+  };
+}
+
+export function getDefaultCharacterCardImportSettingsForProvider(provider: ProviderPreset): CharacterCardImportSettings {
+  // Same model for both providers - deepseek works well for this task
+  return {
+    profileId: null,
+    model: 'deepseek/deepseek-v3.2',
+    temperature: 0.3,
+    maxTokens: 16384,
+    systemPrompt: DEFAULT_CHARACTER_CARD_IMPORT_PROMPT,
+    reasoningEffort: 'off',
+    providerOnly: [],
+    manualBody: '',
+  };
+}
+
 // Combined system services settings
 export interface SystemServicesSettings {
   classifier: ClassifierSettings;
@@ -925,6 +1031,7 @@ export interface SystemServicesSettings {
   timelineFill: TimelineFillSettings;
   entryRetrieval: EntryRetrievalSettings;
   imageGeneration: ImageGenerationServiceSettings;
+  characterCardImport: CharacterCardImportSettings;
 }
 
 export function getDefaultSystemServicesSettings(): SystemServicesSettings {
@@ -940,6 +1047,7 @@ export function getDefaultSystemServicesSettings(): SystemServicesSettings {
     timelineFill: getDefaultTimelineFillSettings(),
     entryRetrieval: getDefaultEntryRetrievalSettings(),
     imageGeneration: getDefaultImageGenerationSettings(),
+    characterCardImport: getDefaultCharacterCardImportSettings(),
   };
 }
 
@@ -956,6 +1064,7 @@ export function getDefaultSystemServicesSettingsForProvider(provider: ProviderPr
     timelineFill: getDefaultTimelineFillSettingsForProvider(provider),
     entryRetrieval: getDefaultEntryRetrievalSettingsForProvider(provider),
     imageGeneration: getDefaultImageGenerationSettingsForProvider(provider),
+    characterCardImport: getDefaultCharacterCardImportSettingsForProvider(provider),
   };
 }
 
@@ -1212,6 +1321,7 @@ class SettingsStore {
             timelineFill: { ...defaults.timelineFill, ...loaded.timelineFill },
             entryRetrieval: { ...defaults.entryRetrieval, ...loaded.entryRetrieval },
             imageGeneration: { ...defaults.imageGeneration, ...loaded.imageGeneration },
+            characterCardImport: { ...defaults.characterCardImport, ...loaded.characterCardImport },
           };
 
           const isMissingProfileId = (profileId: string | null | undefined): boolean => {
@@ -1987,6 +2097,11 @@ class SettingsStore {
 
   async resetImageGenerationSettings() {
     this.systemServicesSettings.imageGeneration = getDefaultImageGenerationSettingsForProvider(this.getEffectiveProvider());
+    await this.saveSystemServicesSettings();
+  }
+
+  async resetCharacterCardImportSettings() {
+    this.systemServicesSettings.characterCardImport = getDefaultCharacterCardImportSettingsForProvider(this.getEffectiveProvider());
     await this.saveSystemServicesSettings();
   }
 
