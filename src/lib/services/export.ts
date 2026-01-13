@@ -1,7 +1,7 @@
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { database } from './database';
-import type { Story, StoryEntry, Character, Location, Item, StoryBeat, Entry, PersistentStyleReviewState, EmbeddedImage } from '$lib/types';
+import type { Story, StoryEntry, Character, Location, Item, StoryBeat, Chapter, Entry, Checkpoint, Branch, PersistentStyleReviewState, EmbeddedImage } from '$lib/types';
 
 export interface AventuraExport {
   version: string;
@@ -16,6 +16,8 @@ export interface AventuraExport {
   styleReviewState?: PersistentStyleReviewState | null; // Added in v1.2.0
   // Note: story.timeTracker added in v1.3.0
   embeddedImages?: EmbeddedImage[]; // Added in v1.4.0
+  checkpoints?: Checkpoint[]; // Added in v1.6.0
+  branches?: Branch[]; // Added in v1.6.0
 }
 
 // Version history for import compatibility
@@ -25,9 +27,10 @@ export interface AventuraExport {
 // v1.3.0 - Added timeTracker to story, entry metadata (timeStart/timeEnd)
 // v1.4.0 - Added embeddedImages (generated images embedded in story entries)
 // v1.5.0 - Added character portraits
+// v1.6.0 - Added checkpoints and branches
 
 class ExportService {
-  private readonly VERSION = '1.5.0';
+  private readonly VERSION = '1.6.0';
 
   /**
    * Compare semantic versions. Returns:
@@ -65,6 +68,9 @@ class ExportService {
     if (this.compareVersions(importVersion, '1.5.0') < 0) {
       console.warn(`[Import] File from v${importVersion} predates character portraits (v1.5.0). Character portraits will not be restored.`);
     }
+    if (this.compareVersions(importVersion, '1.6.0') < 0) {
+      console.warn(`[Import] File from v${importVersion} predates branching data (v1.6.0). Branches and checkpoints will not be restored.`);
+    }
   }
 
   // Export to Aventura format (.avt - JSON)
@@ -76,7 +82,9 @@ class ExportService {
     items: Item[],
     storyBeats: StoryBeat[],
     lorebookEntries: Entry[] = [],
-    embeddedImages: EmbeddedImage[] = []
+    embeddedImages: EmbeddedImage[] = [],
+    checkpoints: Checkpoint[] = [],
+    branches: Branch[] = []
   ): Promise<boolean> {
     const exportData: AventuraExport = {
       version: this.VERSION,
@@ -90,6 +98,8 @@ class ExportService {
       lorebookEntries,
       styleReviewState: story.styleReviewState,
       embeddedImages,
+      checkpoints,
+      branches,
     };
 
     const filePath = await save({
@@ -265,10 +275,29 @@ class ExportService {
 
       // Generate new IDs to avoid conflicts
       const oldToNewId = new Map<string, string>();
+      const branchIdMap = new Map<string, string>();
+      const checkpointIdMap = new Map<string, string>();
 
       // Create new story ID
       const newStoryId = crypto.randomUUID();
       oldToNewId.set(data.story.id, newStoryId);
+
+      // Pre-map entry IDs (branches can reference fork entries)
+      for (const entry of data.entries) {
+        oldToNewId.set(entry.id, crypto.randomUUID());
+      }
+
+      // Pre-map branch/checkpoint IDs if present
+      if (data.branches) {
+        for (const branch of data.branches) {
+          branchIdMap.set(branch.id, crypto.randomUUID());
+        }
+      }
+      if (data.checkpoints) {
+        for (const checkpoint of data.checkpoints) {
+          checkpointIdMap.set(checkpoint.id, crypto.randomUUID());
+        }
+      }
 
       // Create the story with a modified title to indicate it was imported (unless skipped for sync)
       const importedStory: Omit<Story, 'createdAt' | 'updatedAt'> = {
@@ -283,14 +312,85 @@ class ExportService {
         retryState: null, // Clear retry state on import
         styleReviewState: data.styleReviewState ?? null, // Restore style review state from export (v1.2.0+)
         timeTracker: data.story.timeTracker ?? null, // Restore time tracker from export
-        currentBranchId: null, // Branches are not exported/imported yet
+        currentBranchId: null, // Set after branch import (if available)
       };
 
       await database.createStory(importedStory);
 
+      const mapBranchId = (branchId: string | null | undefined) =>
+        branchId ? branchIdMap.get(branchId) ?? null : null;
+      const mapEntryId = (entryId: string | null | undefined) =>
+        entryId ? oldToNewId.get(entryId) ?? entryId : null;
+
+      // Import branches (insert parents before children)
+      const branchCheckpointMap = new Map<string, string | null>();
+      if (data.branches && data.branches.length > 0) {
+        const pending = [...data.branches];
+        const inserted = new Set<string>();
+        let progress = true;
+
+        while (pending.length > 0 && progress) {
+          progress = false;
+          for (let i = pending.length - 1; i >= 0; i--) {
+            const branch = pending[i];
+            const newBranchId = branchIdMap.get(branch.id);
+            if (!newBranchId) {
+              pending.splice(i, 1);
+              continue;
+            }
+
+            const mappedParentId = branch.parentBranchId
+              ? branchIdMap.get(branch.parentBranchId) ?? null
+              : null;
+            if (mappedParentId && !inserted.has(mappedParentId)) {
+              continue;
+            }
+
+            await database.addBranch({
+              id: newBranchId,
+              storyId: newStoryId,
+              name: branch.name,
+              parentBranchId: mappedParentId,
+              forkEntryId: mapEntryId(branch.forkEntryId) ?? branch.forkEntryId,
+              checkpointId: null,
+              createdAt: branch.createdAt,
+            });
+
+            const mappedCheckpointId = branch.checkpointId
+              ? checkpointIdMap.get(branch.checkpointId) ?? null
+              : null;
+            branchCheckpointMap.set(newBranchId, mappedCheckpointId);
+
+            inserted.add(newBranchId);
+            pending.splice(i, 1);
+            progress = true;
+          }
+        }
+
+        // If any branches remain, insert them with no parent to avoid FK errors
+        for (const branch of pending) {
+          const newBranchId = branchIdMap.get(branch.id);
+          if (!newBranchId) continue;
+          await database.addBranch({
+            id: newBranchId,
+            storyId: newStoryId,
+            name: branch.name,
+            parentBranchId: null,
+            forkEntryId: mapEntryId(branch.forkEntryId) ?? branch.forkEntryId,
+            checkpointId: null,
+            createdAt: branch.createdAt,
+          });
+
+          const mappedCheckpointId = branch.checkpointId
+            ? checkpointIdMap.get(branch.checkpointId) ?? null
+            : null;
+          branchCheckpointMap.set(newBranchId, mappedCheckpointId);
+        }
+      }
+
       // Import entries
       for (const entry of data.entries) {
-        const newEntryId = crypto.randomUUID();
+        const newEntryId = oldToNewId.get(entry.id) ?? crypto.randomUUID();
         oldToNewId.set(entry.id, newEntryId);
 
         await database.addStoryEntry({
@@ -298,10 +398,10 @@ class ExportService {
           storyId: newStoryId,
           type: entry.type,
           content: entry.content,
-          parentId: entry.parentId ? oldToNewId.get(entry.parentId) ?? null : null,
+          parentId: entry.parentId ? (oldToNewId.get(entry.parentId) ?? null) : null,
           position: entry.position,
           metadata: entry.metadata,
-          branchId: null, // Imported entries go to main branch
+          branchId: mapBranchId(entry.branchId ?? null),
         });
       }
 
@@ -322,7 +422,7 @@ class ExportService {
             metadata: char.metadata,
             visualDescriptors: char.visualDescriptors ?? [],
             portrait: char.portrait ?? null,
-            branchId: null, // Imported stories start on main branch
+            branchId: mapBranchId(char.branchId ?? null),
           });
         }
       }
@@ -342,7 +442,7 @@ class ExportService {
             current: loc.current,
             connections: loc.connections.map(c => oldToNewId.get(c) ?? c),
             metadata: loc.metadata,
-            branchId: null, // Imported stories start on main branch
+            branchId: mapBranchId(loc.branchId ?? null),
           });
         }
       }
@@ -353,6 +453,10 @@ class ExportService {
           const newItemId = crypto.randomUUID();
           oldToNewId.set(item.id, newItemId);
 
+          const mappedLocation = item.location === 'inventory'
+            ? 'inventory'
+            : (oldToNewId.get(item.location) ?? item.location);
+
           await database.addItem({
             id: newItemId,
             storyId: newStoryId,
@@ -360,9 +464,9 @@ class ExportService {
             description: item.description,
             quantity: item.quantity,
             equipped: item.equipped,
-            location: item.location,
+            location: mappedLocation,
             metadata: item.metadata,
-            branchId: null, // Imported stories start on main branch
+            branchId: mapBranchId(item.branchId ?? null),
           });
         }
       }
@@ -383,7 +487,7 @@ class ExportService {
             triggeredAt: beat.triggeredAt,
             resolvedAt: beat.resolvedAt ?? null,
             metadata: beat.metadata,
-            branchId: null, // Imported stories start on main branch
+            branchId: mapBranchId(beat.branchId ?? null),
           });
         }
       }
@@ -413,8 +517,108 @@ class ExportService {
             createdAt: entry.createdAt || Date.now(),
             updatedAt: Date.now(),
             loreManagementBlacklisted: entry.loreManagementBlacklisted || false,
-            branchId: null, // Imported stories start on main branch
+            branchId: mapBranchId(entry.branchId ?? null),
           });
+        }
+      }
+
+      // Import checkpoints (added in v1.6.0)
+      if (data.checkpoints) {
+        const remapEntityId = (id: string) => oldToNewId.get(id) ?? id;
+        const remapBranchId = (id: string | null | undefined) =>
+          id ? branchIdMap.get(id) ?? null : null;
+        const remapStoryEntry = (entry: StoryEntry): StoryEntry => ({
+          ...entry,
+          id: remapEntityId(entry.id),
+          storyId: newStoryId,
+          parentId: entry.parentId ? (remapEntityId(entry.parentId) ?? entry.parentId) : null,
+          branchId: remapBranchId(entry.branchId ?? null),
+        });
+        const remapCharacter = (char: Character): Character => ({
+          ...char,
+          id: remapEntityId(char.id),
+          storyId: newStoryId,
+          branchId: remapBranchId(char.branchId ?? null),
+        });
+        const remapLocation = (loc: Location): Location => ({
+          ...loc,
+          id: remapEntityId(loc.id),
+          storyId: newStoryId,
+          branchId: remapBranchId(loc.branchId ?? null),
+          connections: loc.connections.map(id => oldToNewId.get(id) ?? id),
+        });
+        const remapItem = (item: Item): Item => ({
+          ...item,
+          id: remapEntityId(item.id),
+          storyId: newStoryId,
+          branchId: remapBranchId(item.branchId ?? null),
+          location: item.location === 'inventory'
+            ? 'inventory'
+            : (oldToNewId.get(item.location) ?? item.location),
+        });
+        const remapStoryBeat = (beat: StoryBeat): StoryBeat => ({
+          ...beat,
+          id: remapEntityId(beat.id),
+          storyId: newStoryId,
+          branchId: remapBranchId(beat.branchId ?? null),
+        });
+        const remapChapter = (chapter: Chapter): Chapter => ({
+          ...chapter,
+          id: remapEntityId(chapter.id),
+          storyId: newStoryId,
+          startEntryId: remapEntityId(chapter.startEntryId),
+          endEntryId: remapEntityId(chapter.endEntryId),
+          branchId: remapBranchId(chapter.branchId ?? null),
+        });
+        const remapLorebookEntry = (entry: Entry): Entry => ({
+          ...entry,
+          id: remapEntityId(entry.id),
+          storyId: newStoryId,
+          branchId: remapBranchId(entry.branchId ?? null),
+          firstMentioned: entry.firstMentioned ? (oldToNewId.get(entry.firstMentioned) ?? entry.firstMentioned) : null,
+          lastMentioned: entry.lastMentioned ? (oldToNewId.get(entry.lastMentioned) ?? entry.lastMentioned) : null,
+        });
+
+        for (const checkpoint of data.checkpoints) {
+          const newCheckpointId = checkpointIdMap.get(checkpoint.id) ?? crypto.randomUUID();
+          checkpointIdMap.set(checkpoint.id, newCheckpointId);
+
+          await database.createCheckpoint({
+            id: newCheckpointId,
+            storyId: newStoryId,
+            name: checkpoint.name,
+            lastEntryId: remapEntityId(checkpoint.lastEntryId),
+            lastEntryPreview: checkpoint.lastEntryPreview,
+            entryCount: checkpoint.entryCount,
+            entriesSnapshot: checkpoint.entriesSnapshot.map(remapStoryEntry),
+            charactersSnapshot: checkpoint.charactersSnapshot.map(remapCharacter),
+            locationsSnapshot: checkpoint.locationsSnapshot.map(remapLocation),
+            itemsSnapshot: checkpoint.itemsSnapshot.map(remapItem),
+            storyBeatsSnapshot: checkpoint.storyBeatsSnapshot.map(remapStoryBeat),
+            chaptersSnapshot: checkpoint.chaptersSnapshot.map(remapChapter),
+            timeTrackerSnapshot: checkpoint.timeTrackerSnapshot,
+            lorebookEntriesSnapshot: checkpoint.lorebookEntriesSnapshot
+              ? checkpoint.lorebookEntriesSnapshot.map(remapLorebookEntry)
+              : undefined,
+            createdAt: checkpoint.createdAt ?? Date.now(),
+          });
+        }
+      }
+
+      // Update branch checkpoint references (after checkpoints exist)
+      if (branchCheckpointMap.size > 0) {
+        for (const [branchId, checkpointId] of branchCheckpointMap.entries()) {
+          if (checkpointId) {
+            await database.updateBranch(branchId, { checkpointId });
+          }
+        }
+      }
+
+      // Restore current branch if available
+      if (data.story.currentBranchId) {
+        const mappedCurrentBranch = branchIdMap.get(data.story.currentBranchId) ?? null;
+        if (mappedCurrentBranch) {
+          await database.setStoryCurrentBranch(newStoryId, mappedCurrentBranch);
         }
       }
 

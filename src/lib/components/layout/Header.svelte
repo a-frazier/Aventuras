@@ -49,17 +49,38 @@
   async function exportAventura() {
     if (!story.currentStory) return;
     showExportMenu = false;
-    // Fetch embedded images for export
-    const embeddedImages = await database.getEmbeddedImagesForStory(story.currentStory.id);
+    const [
+      entries,
+      characters,
+      locations,
+      items,
+      storyBeats,
+      lorebookEntries,
+      embeddedImages,
+      checkpoints,
+      branches,
+    ] = await Promise.all([
+      database.getStoryEntries(story.currentStory.id),
+      database.getCharacters(story.currentStory.id),
+      database.getLocations(story.currentStory.id),
+      database.getItems(story.currentStory.id),
+      database.getStoryBeats(story.currentStory.id),
+      database.getEntries(story.currentStory.id),
+      database.getEmbeddedImagesForStory(story.currentStory.id),
+      database.getCheckpoints(story.currentStory.id),
+      database.getBranches(story.currentStory.id),
+    ]);
     await exportService.exportToAventura(
       story.currentStory,
-      story.entries,
-      story.characters,
-      story.locations,
-      story.items,
-      story.storyBeats,
-      story.lorebookEntries,
-      embeddedImages
+      entries,
+      characters,
+      locations,
+      items,
+      storyBeats,
+      lorebookEntries,
+      embeddedImages,
+      checkpoints,
+      branches
     );
   }
 

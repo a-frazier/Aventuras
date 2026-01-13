@@ -1091,11 +1091,23 @@ class DatabaseService {
     );
   }
 
-  async updateBranch(id: string, updates: Partial<Pick<Branch, 'name'>>): Promise<void> {
+  async updateBranch(id: string, updates: Partial<Pick<Branch, 'name' | 'checkpointId'>>): Promise<void> {
     const db = await this.getDb();
+    const setClauses: string[] = [];
+    const values: any[] = [];
+
     if (updates.name !== undefined) {
-      await db.execute('UPDATE branches SET name = ? WHERE id = ?', [updates.name, id]);
+      setClauses.push('name = ?');
+      values.push(updates.name);
     }
+    if (updates.checkpointId !== undefined) {
+      setClauses.push('checkpoint_id = ?');
+      values.push(updates.checkpointId ?? null);
+    }
+
+    if (setClauses.length === 0) return;
+    values.push(id);
+    await db.execute(`UPDATE branches SET ${setClauses.join(', ')} WHERE id = ?`, values);
   }
 
   async deleteBranch(id: string): Promise<void> {
