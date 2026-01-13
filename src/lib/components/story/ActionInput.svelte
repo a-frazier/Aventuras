@@ -15,6 +15,7 @@
     emitUserInput,
     emitNarrativeResponse,
     emitSuggestionsReady,
+    emitTTSQueued,
     eventBus,
     type ResponseStreamingEvent,
     type ClassificationCompleteEvent,
@@ -770,6 +771,14 @@
         // Emit NarrativeResponse event
         emitNarrativeResponse(narrationEntry.id, fullResponse);
 
+        // Phase 2.5: Trigger TTS for auto-play if enabled (background, non-blocking)
+        // Do this IMMEDIATELY after text generation is complete, before classification
+        const ttsSettings = settings.systemServicesSettings.tts;
+        if (ttsSettings.enabled && ttsSettings.autoPlay) {
+          emitTTSQueued(narrationEntry.id, fullResponse);
+          log('TTS queued for auto-play', { entryId: narrationEntry.id });
+        }
+
         // Phase 3: Classify the response to extract world state changes
         // Pass visible entries so classifier can see full chat history with time data
         // Filter out the current narration entry to avoid sending it twice (once in chatHistory, once as narrativeResponse)
@@ -832,6 +841,7 @@
             // Store for manual generation if auto-generate is disabled
             lastImageGenContext = imageGenContext;
 
+            // Phase 9.5: Generate images for imageable scenes (background, non-blocking)
             if (settings.systemServicesSettings.imageGeneration.autoGenerate && aiService.isImageGenerationEnabled()) {
               aiService.generateImagesForNarrative(imageGenContext).catch(err => {
                 log('Image generation failed (non-fatal)', err);
