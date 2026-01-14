@@ -972,12 +972,50 @@ Example: If character has bloated appearance with duplicate Face/Hair/Eyes entri
 - This prevents story beats from stacking up indefinitely
 - Example: If "Find the missing brother" was active and the brother is found, mark it completed
 
+### Time Progression - ALWAYS assess how much time passed:
+Determine how much narrative time elapsed during this passage. Consider what activities occurred and how long they would realistically take.
+
+**"none"** - No meaningful time passes:
+- Brief dialogue exchanges in an ongoing conversation
+- Quick actions (drawing a weapon, opening a door, picking something up)
+- Immediate reactions or observations
+- Example: "She nodded and replied, 'I understand.'" = none
+- Example: "He drew his sword and faced the enemy." = none
+
+**"minutes"** - A short period passes (will add ~15 minutes):
+- Extended conversations or negotiations
+- Searching a room or small area
+- A brief combat encounter
+- Eating a quick meal, getting dressed
+- Walking a short distance within the same location
+- Example: "They discussed the plan in detail, weighing each option." = minutes
+- Example: "She searched the study, checking every drawer." = minutes
+
+**"hours"** - A moderate period passes (will add ~2 hours):
+- Traveling between locations (walking across town, riding to a nearby village)
+- Lengthy activities (a full meal at a tavern, a meeting, research in a library)
+- Waiting for something or someone
+- A complex task requiring sustained effort
+- Example: "They rode through the forest until reaching the crossroads." = hours
+- Example: "He spent the afternoon studying the ancient texts." = hours
+
+**"days"** - Significant time passes (will add 1 day):
+- Sleeping, resting overnight, or waking up the next day
+- Long journeys (traveling to a distant location)
+- Explicit time skips ("days later", "the following week")
+- Extended recovery from injury or illness
+- Example: "She slept through the night and woke at dawn." = days
+- Example: "After three days of travel, they finally arrived." = days
+
+**When uncertain:** Lean toward incrementing time rather than "none" - stories feel more dynamic when time progresses. If any notable activity occurred beyond immediate dialogue/reactions, choose at least "minutes".
+
 ## Critical Rules
 1. When in doubt, DO NOT extract - false positives pollute the world state
 2. Only extract what ACTUALLY HAPPENED, not what might happen
 3. Use the exact names from the text, don't invent or embellish
 4. ALWAYS check if active story beats should be marked completed or failed
-5. Respond with valid JSON only - no markdown, no explanation`,
+5. ALWAYS assess timeProgression - prefer incrementing time over "none" when activities occur
+6. Respond with valid JSON only - no markdown, no explanation`,
   userContent: `Analyze this narrative passage and extract world state changes.
 
 ## Context
@@ -1048,7 +1086,7 @@ newStoryBeats: [{"title": "Short Title", "description": "what happened or was le
 
 scene.currentLocationName: {{sceneLocationDesc}}
 scene.presentCharacterNames: Names of characters physically present in the scene
-scene.timeProgression: How much time passed - "none", "minutes", "hours", or "days"
+scene.timeProgression: Time elapsed based on activities - "none" (instant actions/brief dialogue), "minutes" (conversations/searches/short walks), "hours" (travel/lengthy tasks), "days" (sleep/long journeys/time skips). When in doubt, increment.
 
 Return valid JSON only. Empty arrays are fine - don't invent entities that aren't clearly in the text.`,
 };
