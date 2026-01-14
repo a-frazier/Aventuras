@@ -23,9 +23,9 @@ export interface ImageableScene {
   sceneType: 'action' | 'item' | 'character' | 'environment';
   /** Priority 1-10, higher = more important */
   priority: number;
-  /** Character name if this scene depicts a specific character with a portrait, or null */
-  character: string | null;
-  /** If true, generate a portrait for this character (portrait mode only) */
+  /** Character names depicted in this scene (up to 3). First character is primary. Empty array for environment-only scenes. */
+  characters: string[];
+  /** If true, generate a portrait for the first character (portrait mode only) */
   generatePortrait: boolean;
 }
 
@@ -225,7 +225,7 @@ export class ImagePromptService {
           sourceText: String(item.sourceText),
           sceneType: this.normalizeSceneType(item.sceneType),
           priority: Math.min(10, Math.max(1, Number(item.priority) || 5)),
-          character: this.normalizeCharacter(item.character),
+          characters: this.normalizeCharacters(item.characters),
           generatePortrait: Boolean(item.generatePortrait),
         }));
     } catch (error) {
@@ -237,17 +237,21 @@ export class ImagePromptService {
   }
 
   /**
-   * Normalize character field - returns character name or null.
+   * Normalize characters array field - returns array of character names (max 3).
    */
-  private normalizeCharacter(character: unknown): string | null {
-    if (!character || typeof character !== 'string') {
-      return null;
+  private normalizeCharacters(characters: unknown): string[] {
+    if (!Array.isArray(characters)) {
+      return [];
     }
-    const normalized = character.trim().toLowerCase();
-    if (normalized === 'none' || normalized === '' || normalized === 'null') {
-      return null;
-    }
-    return character.trim(); // Return original casing
+
+    return characters
+      .filter((c): c is string => typeof c === 'string')
+      .map(c => c.trim())
+      .filter(c => {
+        const lower = c.toLowerCase();
+        return c.length > 0 && lower !== 'none' && lower !== 'null';
+      })
+      .slice(0, 3); // Max 3 characters
   }
 
   /**

@@ -1901,101 +1901,135 @@ const imagePromptAnalysisReferenceTemplate: PromptTemplate = {
   content: `You identify visually striking moments in narrative text for image generation WITH REFERENCE IMAGES.
 
 ## Your Task
-Analyze the narrative and identify 0-{{maxImages}} key visual moments (0 = unlimited). Create image prompts (aim for 400-600 characters each). **Do NOT exceed 600 characters per prompt.**
+Analyze the narrative and identify 0-{{maxImages}} key visual moments (0 = unlimited). Create concise image prompts.
 
-IMPORTANT: In portrait mode, ONLY characters with portraits can be depicted in images. Characters without portraits CANNOT appear in generated images until they have a portrait.
+**Prompt length targets:**
+- Single character: 200-350 characters
+- Multi-character (2-3): 350-500 characters
+- Portrait generation: 300-450 characters
+- Environment only: 150-250 characters
 
-## Style (MUST include in every prompt)
+IMPORTANT: In portrait mode, ONLY characters with portraits can be depicted. Characters without portraits CANNOT appear until they have one.
+
+## Style Keywords (pick 2-3 relevant ones per prompt)
 {{imageStylePrompt}}
 
-## Characters With Portraits (CAN be depicted)
+## Characters With Portraits
 {{charactersWithPortraits}}
 
-ONLY these characters can appear in images. When depicting them, do NOT describe their appearance - the reference image provides that. Focus on action, pose, and environment.
-
-## Character Visual Descriptors (for portrait generation reference)
+## Character Visual Descriptors
 {{characterDescriptors}}
 
+## CRITICAL: Never Use Character Names in Prompts
+Image models don't know who "Elena" or "Marcus" are. Character names are ONLY for the JSON fields, NEVER in the prompt text itself.
+
+**WRONG:** "Elena wielding a sword while Marcus watches"
+**RIGHT:** "Woman with silver hair wielding sword, tall man with brown hair watching nearby"
+
 ## Output Format
-Return a JSON array (no markdown, just raw JSON):
+Return a JSON array (no markdown):
 [
   {
-    "prompt": "Prompt (400-600 chars) - for characters with portraits, focus on action/pose/environment, NOT appearance",
+    "prompt": "Concise visual description - NO character names, only visual traits",
     "sourceText": "exact phrase from narrative (3-15 words, VERBATIM)",
     "sceneType": "action|item|character|environment",
     "priority": 1-10,
-    "character": "CharacterName or none",
+    "characters": ["Character1", "Character2"],
     "generatePortrait": false
   }
 ]
 
-## generatePortrait Field - Creating Portraits for New Characters
-When a NEW named character is introduced who does NOT have a portrait yet (not in "Characters With Portraits" list):
-- You MAY request portrait generation by setting "generatePortrait": true
-- Portraits are generated FIRST, so you CAN include BOTH a portrait request AND scene images for the same character in the same output
-- When generatePortrait is true: create a FULL BODY portrait prompt (head to feet, neutral background)
-- For portrait prompts: use the character's visual descriptors to describe their appearance
+Note: First character in the array is the primary character.
 
-## Prompt Structure (for scenes WITH character reference)
-1. **"The character"** - Do NOT describe appearance, the reference image provides this
-2. **Action/pose** - what they're doing, body position, expression (if dramatic)
-3. **Setting/environment** - where they are, lighting, atmosphere, background details
-4. **Style keywords** - copy relevant phrases from the Style section
+## Prompt Structure
 
-## Prompt Structure (for portrait generation - generatePortrait: true)
-1. **Character appearance** - use visual descriptors to describe hair, eyes, skin, features, clothing
-2. **Expression** - neutral or slight smile
-3. **Framing** - FULL BODY portrait, head to feet visible, standing in relaxed natural pose
-4. **Background** - simple, neutral (gradient or soft bokeh)
-5. **Style keywords** - from the Style section
+**SINGLE character (has portrait):**
+- Use "The character" or "A [gender]" - reference image provides appearance
+- Action/pose, expression
+- Setting, lighting, atmosphere
+- 2-3 style keywords
 
-## Example Outputs
+**MULTI-CHARACTER (2-3, all have portraits):**
+- Describe each by KEY visual traits only (hair color/style, one distinctive feature)
+- Spatial arrangement (left/right, foreground/background, facing each other)
+- Actions/poses
+- Brief setting
+- 2-3 style keywords
 
-**Scene with existing portrait:**
+**PORTRAIT generation (generatePortrait: true):**
+- Full body, head to feet visible
+- Key appearance traits from visual descriptors
+- Relaxed standing pose, facing viewer
+- **Plain solid color or simple gradient background ONLY** - no objects, no environment, no scenery
+- 2-3 style keywords
+
+## Examples
+
+**Single character:**
 {
-  "prompt": "The character wielding a glowing sword in defensive stance. Rain-soaked alley at night, neon reflections. Dramatic backlighting. Semi-realistic anime style.",
+  "prompt": "The character in defensive stance, gripping glowing sword. Rain-soaked alley, neon reflections, dramatic backlighting. Anime style, cinematic.",
   "sourceText": "gripped her sword tightly",
   "sceneType": "action",
   "priority": 8,
-  "character": "Elena",
+  "characters": ["Elena"],
   "generatePortrait": false
 }
 
-**Creating FULL BODY portrait for NEW character:**
+**Two characters:**
 {
-  "prompt": "Full body portrait of a tall man with short grey hair and weathered face, deep-set brown eyes with crow's feet. Strong jaw, slight stubble. Wearing dark leather armor over a grey tunic, leather boots. Standing in relaxed pose facing viewer, full body visible head to feet. Neutral background with soft blue gradient. Semi-realistic anime style, refined features.",
+  "prompt": "Woman with silver hair and man with brown hair stand back-to-back, weapons drawn. Ruined temple at sunset, golden light through columns. Anime style, dynamic.",
+  "sourceText": "they stood ready to face the horde together",
+  "sceneType": "action",
+  "priority": 9,
+  "characters": ["Elena", "Marcus"],
+  "generatePortrait": false
+}
+
+**Three characters:**
+{
+  "prompt": "Red-haired woman laughing, grey-bearded man with crossed arms, black-haired boy grinning between them. Tavern interior, warm firelight. Soft anime, warm colors.",
+  "sourceText": "the unlikely trio shared a rare moment of levity",
+  "sceneType": "character",
+  "priority": 7,
+  "characters": ["Lily", "Roland", "Pip"],
+  "generatePortrait": false
+}
+
+**Portrait generation:**
+{
+  "prompt": "Full body portrait: tall man, short grey hair, weathered face, brown eyes, stubble. Dark leather armor over grey tunic. Relaxed pose facing viewer, head to feet visible. Plain solid blue-grey gradient background, no objects or scenery. Anime style.",
   "sourceText": "the old mercenary stepped forward",
   "sceneType": "character",
   "priority": 7,
-  "character": "Marcus",
+  "characters": ["Marcus"],
   "generatePortrait": true
 }
 
-**Environment (no character):**
+**Environment:**
 {
-  "prompt": "Ancient library with towering bookshelves, dust motes in shafts of golden light through stained glass windows. Soft anime style, atmospheric.",
+  "prompt": "Ancient library, towering bookshelves, dust motes in golden light through stained glass. Atmospheric, soft anime.",
   "sourceText": "the vast library stretched before them",
   "sceneType": "environment",
   "priority": 5,
-  "character": "none",
+  "characters": [],
   "generatePortrait": false
 }
 
-## CRITICAL Rules
-1. **Characters need portraits for scenes** - to depict a character in a scene, they must have a portrait OR you must also include a generatePortrait request for them
-2. **ONE CHARACTER PER IMAGE** - only depict a single character per prompt
-3. **For characters WITH portraits** - do NOT describe appearance, just action/pose/environment
-4. **generatePortrait** - generates portrait FIRST, then scene images can use it immediately in the same output
-5. **ALWAYS include style** - copy style keywords from the Style section
-6. **Stay under 600 characters**
-7. **sourceText** MUST be COPY-PASTED EXACTLY from the narrative
-8. Return empty array [] if no suitable visual moments exist
+## Rules
+1. **NEVER use character names in prompts** - only visual descriptions
+2. **Keep prompts concise** - don't repeat the entire style block
+3. **Maximum 3 characters per image**
+4. **Describe characters by distinguishing visual traits** - hair color/style, one key feature
+5. **generatePortrait scenes are single-character only**
+6. **Include 2-3 style keywords** - not the entire style description
+7. **sourceText** MUST be VERBATIM from the narrative
+8. Return empty array [] if no suitable moments exist
 
 ## Priority Guidelines
-- 8-10: Dramatic actions, combat, pivotal moments
-- 6-8: Significant items, magical effects, character introductions worth generating a portrait for
-- 5-7: Character emotions, reveals
-- 3-5: Environmental shots, atmosphere`,
+- 8-10: Combat, pivotal moments, dramatic multi-character interactions
+- 6-8: Character introductions, magical effects, significant items
+- 5-7: Emotional moments, reveals
+- 3-5: Environmental atmosphere`,
   userContent: `## Story Context
 {{chatHistory}}
 
@@ -2007,7 +2041,7 @@ When a NEW named character is introduced who does NOT have a portrait yet (not i
 ## Narrative to Analyze
 {{narrativeResponse}}
 
-Identify the most visually striking moments and return the JSON array. For new characters without portraits, you can request BOTH a portrait (generatePortrait: true) AND a scene image - the portrait generates first so the scene can use it.`,
+Identify visually striking moments. Return JSON array. Remember: NEVER use character names in prompts - describe by visual traits only. Keep prompts concise.`,
 };
 
 // Portrait generation template - direct image prompt (not LLM instructions)
@@ -2017,7 +2051,7 @@ const imagePortraitGenerationTemplate: PromptTemplate = {
   name: 'Portrait Generation',
   category: 'service',
   description: 'Direct image prompt template for character portraits',
-  content: `Full body portrait of a character: {{visualDescriptors}}. Standing in a relaxed natural pose, facing the viewer, full body visible from head to feet. Neutral expression or slight smile. Simple gradient background, non-distracting. Portrait composition, centered framing, professional lighting. {{imageStylePrompt}}`,
+  content: `Full body portrait of a character: {{visualDescriptors}}. Standing in a relaxed natural pose, facing the viewer, full body visible from head to feet. Neutral expression or slight smile. Plain solid color gradient background only, no objects, no environment, no scenery. Portrait composition, centered framing, professional lighting. {{imageStylePrompt}}`,
   userContent: '',
 };
 

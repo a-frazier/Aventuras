@@ -169,7 +169,7 @@ export class ImageGenerationService {
       log('Scenes identified', {
         count: scenes.length,
         types: scenes.map(s => s.sceneType),
-        characters: scenes.map(s => s.character),
+        characters: scenes.map(s => s.characters),
       });
 
       // Limit to max images per message (0 = unlimited)
@@ -180,7 +180,7 @@ export class ImageGenerationService {
           : scenes.sort((a, b) => b.priority - a.priority).slice(0, maxImages);
 
       // Separate portrait generation scenes from regular scenes
-      const portraitScenes = scenesToProcess.filter(s => s.generatePortrait && s.character);
+      const portraitScenes = scenesToProcess.filter(s => s.generatePortrait && s.characters.length > 0);
       const regularScenes = scenesToProcess.filter(s => !s.generatePortrait);
 
       // Emit event: analysis complete
@@ -208,9 +208,10 @@ export class ImageGenerationService {
       const updatedCharactersWithPortraits = [...charactersWithPortraits];
 
       for (const scene of portraitScenes) {
+        const characterName = scene.characters[0];
         const result = await this.generateCharacterPortrait(
           context.storyId,
-          scene.character!,
+          characterName,
           scene.prompt,
           imageSettings,
           updatedCharacters
@@ -220,7 +221,7 @@ export class ImageGenerationService {
         if (result) {
           // Update the character in our local array
           const charIndex = updatedCharacters.findIndex(
-            c => c.name.toLowerCase() === scene.character!.toLowerCase()
+            c => c.name.toLowerCase() === characterName.toLowerCase()
           );
           if (charIndex !== -1) {
             updatedCharacters[charIndex] = {
@@ -232,7 +233,7 @@ export class ImageGenerationService {
               updatedCharactersWithPortraits.push(updatedCharacters[charIndex].name);
             }
           }
-          log('Portrait ready for immediate use', { character: scene.character });
+          log('Portrait ready for immediate use', { character: characterName });
         }
       }
 
@@ -295,11 +296,12 @@ export class ImageGenerationService {
     presentCharacters: Character[]
   ): Promise<void> {
     // Handle portrait generation for new characters
-    if (scene.generatePortrait && scene.character) {
-      log('Generating portrait for new character', { character: scene.character });
+    const primaryCharacter = scene.characters[0];
+    if (scene.generatePortrait && primaryCharacter) {
+      log('Generating portrait for new character', { character: primaryCharacter });
       await this.generateCharacterPortrait(
         storyId,
-        scene.character,
+        primaryCharacter,
         scene.prompt,
         imageSettings,
         presentCharacters
@@ -309,29 +311,56 @@ export class ImageGenerationService {
 
     const imageId = crypto.randomUUID();
 
-    // Determine if we should use a reference image
+    // Determine if we should use reference images
     let referenceImageUrls: string[] | undefined;
     let modelToUse = imageSettings.model;
 
-    // If portrait mode is enabled and scene has a character, look for their portrait
-    if (imageSettings.portraitMode && scene.character) {
-      const character = presentCharacters.find(
-        c => c.name.toLowerCase() === scene.character!.toLowerCase()
-      );
+    // If portrait mode is enabled and scene has characters, look for their portraits
+    const sceneCharacters = scene.characters;
 
-      const portraitUrl = normalizeImageDataUrl(character?.portrait);
-      if (portraitUrl) {
-        // Use reference model (default: qwen-image) and attach portrait
+    if (imageSettings.portraitMode && sceneCharacters.length > 0) {
+      // Collect portraits for all characters in the scene (up to 3)
+      const portraitUrls: string[] = [];
+      const charactersWithPortraits: string[] = [];
+      const charactersWithoutPortraits: string[] = [];
+
+      for (const charName of sceneCharacters.slice(0, 3)) {
+        const character = presentCharacters.find(
+          c => c.name.toLowerCase() === charName.toLowerCase()
+        );
+
+        const portraitUrl = normalizeImageDataUrl(character?.portrait);
+        if (portraitUrl) {
+          portraitUrls.push(portraitUrl);
+          charactersWithPortraits.push(charName);
+        } else {
+          charactersWithoutPortraits.push(charName);
+        }
+      }
+
+      if (charactersWithoutPortraits.length > 0) {
+        // In portrait mode, skip scene if ANY character is missing a portrait
+        log('Skipping scene - not all characters have portraits in portrait mode', {
+          characters: sceneCharacters,
+          withPortraits: charactersWithPortraits,
+          missingPortraits: charactersWithoutPortraits,
+        });
+        return;
+      }
+
+      if (portraitUrls.length > 0) {
+        // Use reference model and attach all portraits
         modelToUse = imageSettings.referenceModel || 'qwen-image';
-        referenceImageUrls = [portraitUrl];
-        log('Using character portrait as reference', {
-          character: scene.character,
+        referenceImageUrls = portraitUrls;
+        log('Using character portraits as reference', {
+          characters: charactersWithPortraits,
+          count: portraitUrls.length,
           model: modelToUse,
         });
       } else {
-        // In portrait mode, skip scene images for characters without portraits
-        log('Skipping scene - character has no portrait in portrait mode', {
-          character: scene.character,
+        // In portrait mode, skip scene images if no characters have portraits
+        log('Skipping scene - no characters have portraits in portrait mode', {
+          characters: sceneCharacters,
         });
         return;
       }
