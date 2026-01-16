@@ -1,16 +1,28 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { ui } from '$lib/stores/ui.svelte';
-  import { story } from '$lib/stores/story.svelte';
-  import { settings } from '$lib/stores/settings.svelte';
-  import { aiService } from '$lib/services/ai';
-  import { database } from '$lib/services/database';
-  import { SimpleActivationTracker } from '$lib/services/ai/entryRetrieval';
-  import type { ImageGenerationContext } from '$lib/services/ai/imageGeneration';
-  import { Send, Wand2, MessageSquare, Brain, Sparkles, Feather, RefreshCw, X, PenLine, Square, ImageIcon } from 'lucide-svelte';
-  import type { Chapter } from '$lib/types';
-  import Suggestions from './Suggestions.svelte';
-  import GrammarCheck from './GrammarCheck.svelte';
+  import { tick } from "svelte";
+  import { ui } from "$lib/stores/ui.svelte";
+  import { story } from "$lib/stores/story.svelte";
+  import { settings } from "$lib/stores/settings.svelte";
+  import { aiService } from "$lib/services/ai";
+  import { database } from "$lib/services/database";
+  import { SimpleActivationTracker } from "$lib/services/ai/entryRetrieval";
+  import type { ImageGenerationContext } from "$lib/services/ai/imageGeneration";
+  import {
+    Send,
+    Wand2,
+    MessageSquare,
+    Brain,
+    Sparkles,
+    Feather,
+    RefreshCw,
+    X,
+    PenLine,
+    Square,
+    ImageIcon,
+  } from "lucide-svelte";
+  import type { Chapter } from "$lib/types";
+  import Suggestions from "./Suggestions.svelte";
+  import GrammarCheck from "./GrammarCheck.svelte";
   import {
     emitUserInput,
     emitNarrativeResponse,
@@ -19,14 +31,14 @@
     eventBus,
     type ResponseStreamingEvent,
     type ClassificationCompleteEvent,
-  } from '$lib/services/events';
+  } from "$lib/services/events";
 
   function log(...args: any[]) {
-    console.log('[ActionInput]', ...args);
+    console.log("[ActionInput]", ...args);
   }
 
-  let inputValue = $state('');
-  let actionType = $state<'do' | 'say' | 'think' | 'story' | 'free'>('do');
+  let inputValue = $state("");
+  let actionType = $state<"do" | "say" | "think" | "story" | "free">("do");
   let isRawActionChoice = $state(false); // True when submitting an AI-generated choice (no prefix/suffix)
   let stopRequested = false;
   let activeAbortController: AbortController | null = null;
@@ -34,43 +46,46 @@
   let isManualImageGenRunning = $state(false);
 
   const canShowManualImageGen = $derived(
-    settings.systemServicesSettings.imageGeneration.enabled
-      && !settings.systemServicesSettings.imageGeneration.autoGenerate
-      && !!lastImageGenContext
+    settings.systemServicesSettings.imageGeneration.enabled &&
+      !settings.systemServicesSettings.imageGeneration.autoGenerate &&
+      !!lastImageGenContext,
   );
 
   const manualImageGenDisabled = $derived(
-    ui.isGenerating
-      || isManualImageGenRunning
-      || !settings.systemServicesSettings.imageGeneration.nanoGptApiKey
+    ui.isGenerating ||
+      isManualImageGenRunning ||
+      !settings.systemServicesSettings.imageGeneration.nanoGptApiKey,
   );
 
   // In creative writing mode, show different input style
-  const isCreativeMode = $derived(story.storyMode === 'creative-writing');
+  const isCreativeMode = $derived(story.storyMode === "creative-writing");
 
   $effect(() => {
     const storyId = story.currentStory?.id ?? null;
-    if (!storyId || (lastImageGenContext && lastImageGenContext.storyId !== storyId)) {
+    if (
+      !storyId ||
+      (lastImageGenContext && lastImageGenContext.storyId !== storyId)
+    ) {
       lastImageGenContext = null;
     }
   });
 
   // Register retry callback with UI store so StoryEntry can trigger it
   $effect(() => {
-    log('Registering retry callback');
+    log("Registering retry callback");
     ui.setRetryCallback(handleRetry);
     return () => {
-      log('Unregistering retry callback');
+      log("Unregistering retry callback");
       ui.setRetryCallback(null);
     };
   });
 
   // Register retry last message callback for edit-and-retry feature
   $effect(() => {
-    log('Registering retry last message callback');
+    log("Registering retry last message callback");
     ui.setRetryLastMessageCallback(handleRetryLastMessage);
     return () => {
-      log('Unregistering retry last message callback');
+      log("Unregistering retry last message callback");
       ui.setRetryLastMessageCallback(null);
     };
   });
@@ -79,7 +94,7 @@
   $effect(() => {
     const pendingAction = ui.pendingActionChoice;
     if (pendingAction && !ui.isGenerating) {
-      log('Processing pending action choice:', pendingAction);
+      log("Processing pending action choice:", pendingAction);
       // Set input value and flag as raw (no prefix/suffix needed)
       // User can edit the text before manually submitting
       inputValue = pendingAction;
@@ -101,7 +116,9 @@
     try {
       // Use only the lorebook entries that were activated for the previous response
       // Extract the Entry objects from RetrievedEntry wrappers
-      const activeLorebookEntries = (ui.lastLorebookRetrieval?.all ?? []).map(r => r.entry);
+      const activeLorebookEntries = (ui.lastLorebookRetrieval?.all ?? []).map(
+        (r) => r.entry,
+      );
 
       const result = await aiService.generateSuggestions(
         story.entries,
@@ -109,15 +126,23 @@
         story.currentStory?.genre,
         activeLorebookEntries,
         story.pov,
-        story.tense
+        story.tense,
       );
       ui.setSuggestions(result.suggestions, story.currentStory?.id);
-      log('Suggestions refreshed:', result.suggestions.length, 'with', activeLorebookEntries.length, 'active lorebook entries');
+      log(
+        "Suggestions refreshed:",
+        result.suggestions.length,
+        "with",
+        activeLorebookEntries.length,
+        "active lorebook entries",
+      );
 
       // Emit SuggestionsReady event
-      emitSuggestionsReady(result.suggestions.map(s => ({ text: s.text, type: s.type })));
+      emitSuggestionsReady(
+        result.suggestions.map((s) => ({ text: s.text, type: s.type })),
+      );
     } catch (error) {
-      log('Failed to generate suggestions:', error);
+      log("Failed to generate suggestions:", error);
       ui.clearSuggestions(story.currentStory?.id);
     } finally {
       ui.setSuggestionsLoading(false);
@@ -130,7 +155,7 @@
   function handleSuggestionSelect(text: string) {
     inputValue = text;
     // Focus the input
-    const input = document.querySelector('textarea');
+    const input = document.querySelector("textarea");
     input?.focus();
   }
 
@@ -142,7 +167,7 @@
     try {
       await aiService.generateImagesForNarrative(lastImageGenContext);
     } catch (error) {
-      log('Manual image generation failed (non-fatal)', error);
+      log("Manual image generation failed (non-fatal)", error);
     } finally {
       isManualImageGenRunning = false;
     }
@@ -152,7 +177,10 @@
    * Check if style review should run (every N messages).
    * Runs in background, non-blocking.
    */
-  async function checkStyleReview(shouldIncrement: boolean = true, source: string = 'new') {
+  async function checkStyleReview(
+    shouldIncrement: boolean = true,
+    source: string = "new",
+  ) {
     // Check if style reviewer is enabled
     if (!settings.systemServicesSettings.styleReviewer.enabled) {
       return;
@@ -168,9 +196,10 @@
       ui.incrementStyleReviewCounter();
     }
 
-    const triggerInterval = settings.systemServicesSettings.styleReviewer.triggerInterval;
+    const triggerInterval =
+      settings.systemServicesSettings.styleReviewer.triggerInterval;
 
-    log('Style review counter', {
+    log("Style review counter", {
       source,
       storyId,
       messagesSinceLastReview: ui.messagesSinceLastStyleReview,
@@ -180,15 +209,20 @@
 
     // Check if we've hit the interval threshold
     if (ui.messagesSinceLastStyleReview >= triggerInterval) {
-      log('Triggering style review...');
+      log("Triggering style review...");
       ui.setStyleReviewLoading(true, storyId);
 
       try {
-        const result = await aiService.analyzeStyle(story.entries, story.currentStory?.mode ?? 'adventure', story.pov, story.tense);
+        const result = await aiService.analyzeStyle(
+          story.entries,
+          story.currentStory?.mode ?? "adventure",
+          story.pov,
+          story.tense,
+        );
         ui.setStyleReview(result, storyId);
-        log('Style review complete', { phrasesFound: result.phrases.length });
+        log("Style review complete", { phrasesFound: result.phrases.length });
       } catch (error) {
-        log('Style review failed (non-fatal)', error);
+        log("Style review failed (non-fatal)", error);
       } finally {
         ui.setStyleReviewLoading(false, storyId);
       }
@@ -198,7 +232,10 @@
   /**
    * Generate RPG-style action choices for adventure mode.
    */
-  async function generateActionChoices(narrativeResponse: string, worldState: any) {
+  async function generateActionChoices(
+    narrativeResponse: string,
+    worldState: any,
+  ) {
     if (isCreativeMode || story.entries.length === 0) {
       return;
     }
@@ -207,19 +244,27 @@
     try {
       // Use only the lorebook entries that were activated for the previous response
       // Extract the Entry objects from RetrievedEntry wrappers
-      const activeLorebookEntries = (ui.lastLorebookRetrieval?.all ?? []).map(r => r.entry);
+      const activeLorebookEntries = (ui.lastLorebookRetrieval?.all ?? []).map(
+        (r) => r.entry,
+      );
 
       const result = await aiService.generateActionChoices(
         story.entries,
         worldState,
         narrativeResponse,
         story.pov,
-        activeLorebookEntries
+        activeLorebookEntries,
       );
       ui.setActionChoices(result.choices, story.currentStory?.id);
-      log('Action choices generated:', result.choices.length, 'with', activeLorebookEntries.length, 'active lorebook entries');
+      log(
+        "Action choices generated:",
+        result.choices.length,
+        "with",
+        activeLorebookEntries.length,
+        "active lorebook entries",
+      );
     } catch (error) {
-      log('Failed to generate action choices:', error);
+      log("Failed to generate action choices:", error);
       ui.clearActionChoices(story.currentStory?.id);
     } finally {
       ui.setActionChoicesLoading(false);
@@ -236,16 +281,17 @@
     const config = story.memoryConfig;
     const tokensOutsideBuffer = story.tokensOutsideBuffer;
 
-    log('checkAutoSummarize', {
+    log("checkAutoSummarize", {
       tokensSinceLastChapter: story.tokensSinceLastChapter,
       tokensOutsideBuffer,
       tokenThreshold: config.tokenThreshold,
-      messagesOutsideBuffer: story.messagesSinceLastChapter - config.chapterBuffer,
+      messagesOutsideBuffer:
+        story.messagesSinceLastChapter - config.chapterBuffer,
     });
 
     // Skip if no tokens outside buffer (all messages are protected)
     if (tokensOutsideBuffer === 0) {
-      log('No messages outside buffer, skipping');
+      log("No messages outside buffer, skipping");
       return;
     }
 
@@ -255,32 +301,43 @@
       story.lastChapterEndIndex,
       config,
       tokensOutsideBuffer,
-      story.currentStory?.mode ?? 'adventure',
+      story.currentStory?.mode ?? "adventure",
       story.pov,
-      story.tense
+      story.tense,
     );
 
     if (!analysis.shouldCreateChapter) {
-      log('No chapter needed yet');
+      log("No chapter needed yet");
       return;
     }
 
-    log('Creating new chapter', { optimalEndIndex: analysis.optimalEndIndex });
+    log("Creating new chapter", { optimalEndIndex: analysis.optimalEndIndex });
 
     // Get entries for this chapter
     const startIndex = story.lastChapterEndIndex;
-    const chapterEntries = story.entries.slice(startIndex, analysis.optimalEndIndex);
+    const chapterEntries = story.entries.slice(
+      startIndex,
+      analysis.optimalEndIndex,
+    );
 
     if (chapterEntries.length === 0) {
-      log('No entries for chapter');
+      log("No entries for chapter");
       return;
     }
 
     // Get previous chapters for context (branch-filtered)
-    const previousChapters = [...story.currentBranchChapters].sort((a, b) => a.number - b.number);
+    const previousChapters = [...story.currentBranchChapters].sort(
+      (a, b) => a.number - b.number,
+    );
 
     // Generate chapter summary with previous chapters as context
-    const summary = await aiService.summarizeChapter(chapterEntries, previousChapters, story.currentStory?.mode ?? 'adventure', story.pov, story.tense);
+    const summary = await aiService.summarizeChapter(
+      chapterEntries,
+      previousChapters,
+      story.currentStory?.mode ?? "adventure",
+      story.pov,
+      story.tense,
+    );
 
     // Create the chapter - use database method to handle deletions correctly
     const chapterNumber = await story.getNextChapterNumber();
@@ -312,11 +369,11 @@
     };
 
     await story.addChapter(chapter);
-    log('Chapter created', { number: chapterNumber, title: chapter.title });
+    log("Chapter created", { number: chapterNumber, title: chapter.title });
 
     // Trigger lore management after chapter creation
-    runLoreManagement().catch(err => {
-      console.error('[ActionInput] Lore management failed:', err);
+    runLoreManagement().catch((err) => {
+      console.error("[ActionInput] Lore management failed:", err);
       ui.finishLoreManagement();
     });
   }
@@ -328,7 +385,7 @@
   async function runLoreManagement() {
     if (!story.currentStory) return;
 
-    log('Starting lore management...');
+    log("Starting lore management...");
     ui.startLoreManagement();
 
     let changeCount = 0;
@@ -362,15 +419,24 @@
               createdBy: entry.createdBy,
               loreManagementBlacklisted: entry.loreManagementBlacklisted,
             });
-            ui.updateLoreManagementProgress('Creating entries...', bumpChanges());
+            ui.updateLoreManagementProgress(
+              "Creating entries...",
+              bumpChanges(),
+            );
           },
           onUpdateEntry: async (id, updates) => {
             await story.updateLorebookEntry(id, updates);
-            ui.updateLoreManagementProgress('Updating entries...', bumpChanges());
+            ui.updateLoreManagementProgress(
+              "Updating entries...",
+              bumpChanges(),
+            );
           },
           onDeleteEntry: async (id) => {
             await story.deleteLorebookEntry(id);
-            ui.updateLoreManagementProgress('Cleaning up entries...', bumpChanges());
+            ui.updateLoreManagementProgress(
+              "Cleaning up entries...",
+              bumpChanges(),
+            );
           },
           onMergeEntries: async (entryIds, mergedEntry) => {
             // Delete old entries and create merged one
@@ -391,20 +457,26 @@
               createdBy: mergedEntry.createdBy,
               loreManagementBlacklisted: mergedEntry.loreManagementBlacklisted,
             });
-            ui.updateLoreManagementProgress('Merging entries...', bumpChanges());
+            ui.updateLoreManagementProgress(
+              "Merging entries...",
+              bumpChanges(),
+            );
           },
         },
-        story.currentStory?.mode ?? 'adventure',
+        story.currentStory?.mode ?? "adventure",
         story.pov,
-        story.tense
+        story.tense,
       );
 
-      log('Lore management complete', {
+      log("Lore management complete", {
         changesCount: result.changes.length,
         summary: result.summary,
       });
 
-      ui.updateLoreManagementProgress(`Complete: ${result.summary}`, result.changes.length);
+      ui.updateLoreManagementProgress(
+        `Complete: ${result.summary}`,
+        result.changes.length,
+      );
     } finally {
       // Give user a moment to see the completion message
       setTimeout(() => {
@@ -414,41 +486,43 @@
   }
 
   // Get protagonist name for third person POV
-  const protagonistName = $derived.by(() => (
-    story.characters.find(c => c.relationship === 'self')?.name ?? 'The protagonist'
-  ));
+  const protagonistName = $derived.by(
+    () =>
+      story.characters.find((c) => c.relationship === "self")?.name ??
+      "The protagonist",
+  );
   const pov = $derived(story.pov);
 
   // Generate action prefixes based on POV
   const actionPrefixes = $derived.by(() => {
     switch (pov) {
-      case 'third':
+      case "third":
         return {
           do: `${protagonistName} `,
           say: `${protagonistName} says, "`,
           think: `${protagonistName} thinks, "`,
-          story: '',
-          free: '',
+          story: "",
+          free: "",
         };
-      case 'first':
-      case 'second':
+      case "first":
+      case "second":
       default:
         return {
-          do: 'I ',
+          do: "I ",
           say: 'I say, "',
           think: 'I think to myself, "',
-          story: '',
-          free: '',
+          story: "",
+          free: "",
         };
     }
   });
 
   const actionSuffixes = {
-    do: '',
+    do: "",
     say: '"',
     think: '"',
-    story: '',
-    free: '',
+    story: "",
+    free: "",
   };
 
   /**
@@ -457,23 +531,28 @@
   async function generateResponse(
     userActionEntryId: string,
     userActionContent: string,
-    options?: { countStyleReview?: boolean; styleReviewSource?: string }
+    options?: { countStyleReview?: boolean; styleReviewSource?: string },
   ) {
     const countStyleReview = options?.countStyleReview ?? true;
-    const styleReviewSource = options?.styleReviewSource ?? (countStyleReview ? 'new' : 'regenerate');
-    log('Starting AI generation...', { userActionEntryId, hasCurrentStory: !!story.currentStory });
+    const styleReviewSource =
+      options?.styleReviewSource ?? (countStyleReview ? "new" : "regenerate");
+    log("Starting AI generation...", {
+      userActionEntryId,
+      hasCurrentStory: !!story.currentStory,
+    });
 
     // Ensure we have a current story
     if (!story.currentStory) {
-      log('No current story loaded, cannot generate');
+      log("No current story loaded, cannot generate");
       return;
     }
 
-stopRequested = false;
+    stopRequested = false;
     activeAbortController = new AbortController();
 
     // Check if Visual Prose mode is enabled for this story
-    const visualProseMode = story.currentStory?.settings?.visualProseMode ?? false;
+    const visualProseMode =
+      story.currentStory?.settings?.visualProseMode ?? false;
     // Generate a temp entry ID for Visual Prose CSS scoping during streaming
     const streamingEntryId = crypto.randomUUID();
 
@@ -495,7 +574,7 @@ stopRequested = false;
         lorebookEntries: story.lorebookEntries,
       };
 
-      log('World state built', {
+      log("World state built", {
         characters: worldState.characters.length,
         locations: worldState.locations.length,
         items: worldState.items.length,
@@ -508,8 +587,10 @@ stopRequested = false;
       // Per design doc: Memory retrieval and Entry retrieval run in parallel
       let retrievedChapterContext: string | null = null;
       let lorebookContext: string | null = null;
-      let timelineFillResult: import('$lib/services/ai/timelineFill').TimelineFillResult | null = null;
-      const storyMode = story.currentStory?.mode ?? 'adventure';
+      let timelineFillResult:
+        | import("$lib/services/ai/timelineFill").TimelineFillResult
+        | null = null;
+      const storyMode = story.currentStory?.mode ?? "adventure";
 
       // Build parallel retrieval tasks
       const retrievalTasks: Promise<void>[] = [];
@@ -519,162 +600,191 @@ stopRequested = false;
       // Use branch-filtered chapters for correct branch awareness
       const branchChapters = story.currentBranchChapters;
       if (branchChapters.length > 0 && story.memoryConfig.enableRetrieval) {
-        retrievalTasks.push((async () => {
-          try {
-            const timelineFillEnabled = settings.systemServicesSettings.timelineFill?.enabled ?? true;
-            if (!timelineFillEnabled) {
-              log('Timeline fill disabled, skipping memory retrieval');
-              return;
-            }
-
-            const useAgenticTimelineFill = aiService.shouldUseAgenticRetrieval(branchChapters);
-
-            if (useAgenticTimelineFill) {
-              log('Starting agentic timeline fill...', { chaptersCount: branchChapters.length });
-
-              const agenticResult = await aiService.runAgenticRetrieval(
-                userActionContent,
-                story.visibleEntries,
-                branchChapters,
-                story.lorebookEntries,
-                (chapterNumber, question) =>
-                  aiService.answerChapterQuestion(
-                    chapterNumber,
-                    question,
-                    branchChapters,
-                    story.entries,
-                    activeAbortController?.signal,
-                    storyMode
-                  ),
-                (startChapter, endChapter, question) =>
-                  aiService.answerChapterRangeQuestion(
-                    startChapter,
-                    endChapter,
-                    question,
-                    branchChapters,
-                    story.entries,
-                    activeAbortController?.signal,
-                    storyMode
-                  ),
-                activeAbortController?.signal,
-                storyMode,
-                story.pov,
-                story.tense
-              );
-
-              if (agenticResult.context) {
-                retrievedChapterContext = aiService.formatAgenticRetrievalForPrompt(agenticResult);
-                log('Agentic timeline fill complete', {
-                  iterations: agenticResult.iterations,
-                  queriedChapters: agenticResult.queriedChapters.length,
-                  contextLength: retrievedChapterContext?.length ?? 0,
-                });
-              } else {
-                log('Agentic timeline fill returned no context');
+        retrievalTasks.push(
+          (async () => {
+            try {
+              const timelineFillEnabled =
+                settings.systemServicesSettings.timelineFill?.enabled ?? true;
+              if (!timelineFillEnabled) {
+                log("Timeline fill disabled, skipping memory retrieval");
+                return;
               }
-            } else {
-              log('Starting timeline fill...', { chaptersCount: branchChapters.length });
 
-              // Timeline fill: generates queries and executes them in one go
-              const timelineResult = await aiService.runTimelineFill(
-                userActionContent,
-                story.visibleEntries,
-                branchChapters,
-                story.entries, // All entries for querying chapter content
-                activeAbortController?.signal,
-                storyMode,
-                story.pov,
-                story.tense
-              );
+              const useAgenticTimelineFill =
+                aiService.shouldUseAgenticRetrieval(branchChapters);
 
-              // Store raw result - formatting is now done in buildChapterSummariesBlock
-              timelineFillResult = timelineResult;
-              log('Timeline fill complete', {
-                queriesGenerated: timelineResult.queries.length,
-                responsesCount: timelineResult.responses.length,
-              });
+              if (useAgenticTimelineFill) {
+                log("Starting agentic timeline fill...", {
+                  chaptersCount: branchChapters.length,
+                });
+
+                const agenticResult = await aiService.runAgenticRetrieval(
+                  userActionContent,
+                  story.visibleEntries,
+                  branchChapters,
+                  story.lorebookEntries,
+                  (chapterNumber, question) =>
+                    aiService.answerChapterQuestion(
+                      chapterNumber,
+                      question,
+                      branchChapters,
+                      story.entries,
+                      activeAbortController?.signal,
+                      storyMode,
+                    ),
+                  (startChapter, endChapter, question) =>
+                    aiService.answerChapterRangeQuestion(
+                      startChapter,
+                      endChapter,
+                      question,
+                      branchChapters,
+                      story.entries,
+                      activeAbortController?.signal,
+                      storyMode,
+                    ),
+                  activeAbortController?.signal,
+                  storyMode,
+                  story.pov,
+                  story.tense,
+                );
+
+                if (agenticResult.context) {
+                  retrievedChapterContext =
+                    aiService.formatAgenticRetrievalForPrompt(agenticResult);
+                  log("Agentic timeline fill complete", {
+                    iterations: agenticResult.iterations,
+                    queriedChapters: agenticResult.queriedChapters.length,
+                    contextLength: retrievedChapterContext?.length ?? 0,
+                  });
+                } else {
+                  log("Agentic timeline fill returned no context");
+                }
+              } else {
+                log("Starting timeline fill...", {
+                  chaptersCount: branchChapters.length,
+                });
+
+                // Timeline fill: generates queries and executes them in one go
+                const timelineResult = await aiService.runTimelineFill(
+                  userActionContent,
+                  story.visibleEntries,
+                  branchChapters,
+                  story.entries, // All entries for querying chapter content
+                  activeAbortController?.signal,
+                  storyMode,
+                  story.pov,
+                  story.tense,
+                );
+
+                // Store raw result - formatting is now done in buildChapterSummariesBlock
+                timelineFillResult = timelineResult;
+                log("Timeline fill complete", {
+                  queriesGenerated: timelineResult.queries.length,
+                  responsesCount: timelineResult.responses.length,
+                });
+              }
+            } catch (retrievalError) {
+              if (
+                retrievalError instanceof Error &&
+                retrievalError.name === "AbortError"
+              ) {
+                log("Memory retrieval aborted");
+                return;
+              }
+              log("Memory retrieval failed (non-fatal)", retrievalError);
+              console.warn("Memory retrieval failed:", retrievalError);
             }
-          } catch (retrievalError) {
-            if (retrievalError instanceof Error && retrievalError.name === 'AbortError') {
-              log('Memory retrieval aborted');
-              return;
-            }
-            log('Memory retrieval failed (non-fatal)', retrievalError);
-            console.warn('Memory retrieval failed:', retrievalError);
-          }
-        })());
+          })(),
+        );
       }
 
       // Task 2: Lorebook entry retrieval (Tier 3 LLM selection runs here)
       // Pass live-tracked entities for Tier 1 injection
       // Also pass activation tracker for stickiness calculations
-      if (story.lorebookEntries.length > 0 || story.characters.length > 0 || story.locations.length > 0 || story.items.length > 0) {
-        retrievalTasks.push((async () => {
-          try {
-            // Create activation tracker for stickiness
-            // Current position is the number of story entries (next entry will be at this index)
-            const storyPosition = story.entries.length;
-            const activationTracker = ui.getActivationTracker(storyPosition) as SimpleActivationTracker;
+      if (
+        story.lorebookEntries.length > 0 ||
+        story.characters.length > 0 ||
+        story.locations.length > 0 ||
+        story.items.length > 0
+      ) {
+        retrievalTasks.push(
+          (async () => {
+            try {
+              // Create activation tracker for stickiness
+              // Current position is the number of story entries (next entry will be at this index)
+              const storyPosition = story.entries.length;
+              const activationTracker = ui.getActivationTracker(
+                storyPosition,
+              ) as SimpleActivationTracker;
 
-            log('Starting lorebook retrieval...', {
-              lorebookEntries: story.lorebookEntries.length,
-              liveCharacters: story.characters.length,
-              liveLocations: story.locations.length,
-              liveItems: story.items.length,
-              storyPosition,
-            });
-            const entryResult = await aiService.getRelevantLorebookEntries(
-              story.lorebookEntries,
-              userActionContent,
-              story.visibleEntries.slice(-10),
-              {
-                characters: story.characters,
-                locations: story.locations,
-                items: story.items,
-              },
-              activationTracker,
-              activeAbortController?.signal
-            );
-            lorebookContext = entryResult.contextBlock;
-            // Store retrieval result for debug panel
-            ui.setLastLorebookRetrieval(entryResult);
-            // Update activation data with recorded activations (and persist to database)
-            ui.updateActivationData(activationTracker, story.currentStory?.id);
-            log('Lorebook retrieval complete', {
-              tier1: entryResult.tier1.length,
-              tier2: entryResult.tier2.length,
-              tier3: entryResult.tier3.length,
-              contextLength: lorebookContext?.length ?? 0,
-            });
-          } catch (entryError) {
-            if (entryError instanceof Error && entryError.name === 'AbortError') {
-              log('Lorebook retrieval aborted');
-              return;
+              log("Starting lorebook retrieval...", {
+                lorebookEntries: story.lorebookEntries.length,
+                liveCharacters: story.characters.length,
+                liveLocations: story.locations.length,
+                liveItems: story.items.length,
+                storyPosition,
+              });
+              const entryResult = await aiService.getRelevantLorebookEntries(
+                story.lorebookEntries,
+                userActionContent,
+                story.visibleEntries.slice(-10),
+                {
+                  characters: story.characters,
+                  locations: story.locations,
+                  items: story.items,
+                },
+                activationTracker,
+                activeAbortController?.signal,
+              );
+              lorebookContext = entryResult.contextBlock;
+              // Store retrieval result for debug panel
+              ui.setLastLorebookRetrieval(entryResult);
+              // Update activation data with recorded activations (and persist to database)
+              ui.updateActivationData(
+                activationTracker,
+                story.currentStory?.id,
+              );
+              log("Lorebook retrieval complete", {
+                tier1: entryResult.tier1.length,
+                tier2: entryResult.tier2.length,
+                tier3: entryResult.tier3.length,
+                contextLength: lorebookContext?.length ?? 0,
+              });
+            } catch (entryError) {
+              if (
+                entryError instanceof Error &&
+                entryError.name === "AbortError"
+              ) {
+                log("Lorebook retrieval aborted");
+                return;
+              }
+              log("Lorebook retrieval failed (non-fatal)", entryError);
+              console.warn("Lorebook retrieval failed:", entryError);
             }
-            log('Lorebook retrieval failed (non-fatal)', entryError);
-            console.warn('Lorebook retrieval failed:', entryError);
-          }
-        })());
+          })(),
+        );
       }
 
       // Wait for all retrieval tasks to complete (parallel execution)
       if (retrievalTasks.length > 0) {
-        log('Waiting for parallel retrieval tasks...', { taskCount: retrievalTasks.length });
+        log("Waiting for parallel retrieval tasks...", {
+          taskCount: retrievalTasks.length,
+        });
         await Promise.all(retrievalTasks);
-        log('All retrieval tasks complete');
+        log("All retrieval tasks complete");
       }
 
       if (stopRequested) {
-        log('Generation stopped before streaming started');
+        log("Generation stopped before streaming started");
         return;
       }
 
       // Combine retrieved contexts
-      const combinedRetrievedContext = [retrievedChapterContext, lorebookContext]
-        .filter(Boolean)
-        .join('\n') || null;
+      const combinedRetrievedContext =
+        [retrievedChapterContext, lorebookContext].filter(Boolean).join("\n") ||
+        null;
 
-      let fullResponse = '';
+      let fullResponse = "";
       let chunkCount = 0;
 
       // Capture current story reference for use after streaming
@@ -684,23 +794,25 @@ stopRequested = false;
       const MAX_EMPTY_RESPONSE_RETRIES = 3;
       let retryCount = 0;
 
-// Start streaming indicator now that retrieval is complete
+      // Start streaming indicator now that retrieval is complete
       ui.startStreaming(visualProseMode, streamingEntryId);
 
       while (retryCount < MAX_EMPTY_RESPONSE_RETRIES) {
         // Reset for each attempt
-        fullResponse = '';
+        fullResponse = "";
         chunkCount = 0;
 
-if (retryCount > 0) {
-          log(`Retrying generation (attempt ${retryCount + 1}/${MAX_EMPTY_RESPONSE_RETRIES}) due to empty response...`);
+        if (retryCount > 0) {
+          log(
+            `Retrying generation (attempt ${retryCount + 1}/${MAX_EMPTY_RESPONSE_RETRIES}) due to empty response...`,
+          );
           // startStreaming() clears previous content and restarts
           ui.startStreaming(visualProseMode, streamingEntryId);
         }
 
         // Use streaming response with visible entries only (non-summarized)
         // Per design doc section 3.1.2: summarized entries are excluded from context
-        log('Starting stream iteration...', {
+        log("Starting stream iteration...", {
           hasStyleReview: !!ui.lastStyleReview,
           visibleEntries: story.visibleEntries.length,
           totalEntries: story.entries.length,
@@ -719,10 +831,10 @@ if (retryCount > 0) {
           ui.lastStyleReview,
           combinedRetrievedContext,
           activeAbortController?.signal,
-          timelineFillResult
+          timelineFillResult,
         )) {
           if (stopRequested) {
-            log('Stop requested during streaming');
+            log("Stop requested during streaming");
             break;
           }
           chunkCount++;
@@ -732,19 +844,23 @@ if (retryCount > 0) {
 
             // Emit streaming event
             eventBus.emit<ResponseStreamingEvent>({
-              type: 'ResponseStreaming',
+              type: "ResponseStreaming",
               chunk: chunk.content,
               accumulated: fullResponse,
             });
           }
 
           if (chunk.done) {
-            log('Stream done signal received');
+            log("Stream done signal received");
             break;
           }
         }
 
-        log('Stream complete', { chunkCount, responseLength: fullResponse.length, attempt: retryCount + 1 });
+        log("Stream complete", {
+          chunkCount,
+          responseLength: fullResponse.length,
+          attempt: retryCount + 1,
+        });
 
         // Check if we got a valid response
         if (fullResponse.trim()) {
@@ -754,7 +870,9 @@ if (retryCount > 0) {
         // Empty response, increment retry counter
         retryCount++;
         if (retryCount < MAX_EMPTY_RESPONSE_RETRIES) {
-          log(`Empty response received, will retry (${retryCount}/${MAX_EMPTY_RESPONSE_RETRIES})...`);
+          log(
+            `Empty response received, will retry (${retryCount}/${MAX_EMPTY_RESPONSE_RETRIES})...`,
+          );
         }
       }
 
@@ -763,15 +881,20 @@ if (retryCount > 0) {
       ui.endStreaming();
 
       if (stopRequested) {
-        log('Generation stopped after streaming, skipping save');
+        log("Generation stopped after streaming, skipping save");
         return;
       }
 
       // Save the complete response as a story entry
       if (fullResponse.trim()) {
-        log('Saving narration entry...', { contentLength: fullResponse.length });
-        const narrationEntry = await story.addEntry('narration', fullResponse);
-        log('Narration entry saved', { entryId: narrationEntry.id, entriesCount: story.entries.length });
+        log("Saving narration entry...", {
+          contentLength: fullResponse.length,
+        });
+        const narrationEntry = await story.addEntry("narration", fullResponse);
+        log("Narration entry saved", {
+          entryId: narrationEntry.id,
+          entriesCount: story.entries.length,
+        });
 
         // Emit NarrativeResponse event
         emitNarrativeResponse(narrationEntry.id, fullResponse);
@@ -781,56 +904,68 @@ if (retryCount > 0) {
         const ttsSettings = settings.systemServicesSettings.tts;
         if (ttsSettings.enabled && ttsSettings.autoPlay) {
           emitTTSQueued(narrationEntry.id, fullResponse);
-          log('TTS queued for auto-play', { entryId: narrationEntry.id });
+          log("TTS queued for auto-play", { entryId: narrationEntry.id });
         }
 
         // Phase 3: Classify the response to extract world state changes
         // Pass visible entries so classifier can see full chat history with time data
         // Filter out the current narration entry to avoid sending it twice (once in chatHistory, once as narrativeResponse)
-        log('Starting classification phase...');
+        log("Starting classification phase...");
         try {
-          const chatHistoryEntries = story.visibleEntries.filter(e => e.id !== narrationEntry.id);
+          const chatHistoryEntries = story.visibleEntries.filter(
+            (e) => e.id !== narrationEntry.id,
+          );
           const classificationResult = await aiService.classifyResponse(
             fullResponse,
             userActionContent,
             worldState,
             currentStoryRef,
             chatHistoryEntries,
-            currentStoryRef?.timeTracker
+            currentStoryRef?.timeTracker,
           );
 
-          log('Classification complete', {
-            newCharacters: classificationResult.entryUpdates.newCharacters.length,
+          log("Classification complete", {
+            newCharacters:
+              classificationResult.entryUpdates.newCharacters.length,
             newLocations: classificationResult.entryUpdates.newLocations.length,
             newItems: classificationResult.entryUpdates.newItems.length,
-            newStoryBeats: classificationResult.entryUpdates.newStoryBeats.length,
+            newStoryBeats:
+              classificationResult.entryUpdates.newStoryBeats.length,
           });
 
           // Emit ClassificationComplete event
           eventBus.emit<ClassificationCompleteEvent>({
-            type: 'ClassificationComplete',
+            type: "ClassificationComplete",
             messageId: narrationEntry.id,
             result: classificationResult,
           });
 
           // Phase 4: Apply classification results to world state
           await story.applyClassificationResult(classificationResult);
-          log('World state updated from classification');
+          log("World state updated from classification");
 
           // Phase 9: Generate images for imageable scenes (background, non-blocking)
           // This runs inside the classification try block because we need the presentCharacterNames
-          if (currentStoryRef && settings.systemServicesSettings.imageGeneration.enabled) {
+          if (
+            currentStoryRef &&
+            settings.systemServicesSettings.imageGeneration.enabled
+          ) {
             // Get updated characters from story (includes visual descriptors updates)
-            const presentCharacters = story.characters.filter(c =>
-              classificationResult.scene.presentCharacterNames.includes(c.name) ||
-              c.relationship === 'self'
+            const presentCharacters = story.characters.filter(
+              (c) =>
+                classificationResult.scene.presentCharacterNames.includes(
+                  c.name,
+                ) || c.relationship === "self",
             );
 
             // Build full chat history for image generation context
             const imageGenChatHistory = story.visibleEntries
-              .filter(e => e.type === 'user_action' || e.type === 'narration')
-              .map(e => `${e.type === 'user_action' ? 'USER' : 'ASSISTANT'}:\n${e.content}`)
-              .join('\n\n');
+              .filter((e) => e.type === "user_action" || e.type === "narration")
+              .map(
+                (e) =>
+                  `${e.type === "user_action" ? "USER" : "ASSISTANT"}:\n${e.content}`,
+              )
+              .join("\n\n");
 
             const imageGenContext: ImageGenerationContext = {
               storyId: currentStoryRef.id,
@@ -838,7 +973,9 @@ if (retryCount > 0) {
               narrativeResponse: fullResponse,
               userAction: userActionContent,
               presentCharacters,
-              currentLocation: classificationResult.scene.currentLocationName ?? worldState.currentLocation?.name,
+              currentLocation:
+                classificationResult.scene.currentLocationName ??
+                worldState.currentLocation?.name,
               chatHistory: imageGenChatHistory,
               lorebookContext: lorebookContext ?? undefined,
             };
@@ -846,16 +983,21 @@ if (retryCount > 0) {
             // Store for manual generation if auto-generate is disabled
             lastImageGenContext = imageGenContext;
 
-            if (settings.systemServicesSettings.imageGeneration.autoGenerate && aiService.isImageGenerationEnabled()) {
-              aiService.generateImagesForNarrative(imageGenContext).catch(err => {
-                log('Image generation failed (non-fatal)', err);
-              });
+            if (
+              settings.systemServicesSettings.imageGeneration.autoGenerate &&
+              aiService.isImageGenerationEnabled()
+            ) {
+              aiService
+                .generateImagesForNarrative(imageGenContext)
+                .catch((err) => {
+                  log("Image generation failed (non-fatal)", err);
+                });
             }
           }
         } catch (classifyError) {
           // Classification failure shouldn't break the main flow
-          log('Classification failed (non-fatal)', classifyError);
-          console.warn('World state classification failed:', classifyError);
+          log("Classification failed (non-fatal)", classifyError);
+          console.warn("World state classification failed:", classifyError);
         }
 
         // Phase 4.1: Update narration entry with timeEnd after classification phase
@@ -864,34 +1006,36 @@ if (retryCount > 0) {
 
         // Phase 5: Check if auto-summarization is needed (background, non-blocking)
         if (story.memoryConfig.autoSummarize) {
-          checkAutoSummarize().catch(err => {
-            log('Auto-summarize check failed (non-fatal)', err);
+          checkAutoSummarize().catch((err) => {
+            log("Auto-summarize check failed (non-fatal)", err);
           });
         }
 
         // Phase 6: Generate suggestions for creative writing mode (background, non-blocking)
-        if (isCreativeMode) {
-          refreshSuggestions().catch(err => {
-            log('Suggestions generation failed (non-fatal)', err);
+        if (isCreativeMode && !settings.uiSettings.disableSuggestions) {
+          refreshSuggestions().catch((err) => {
+            log("Suggestions generation failed (non-fatal)", err);
           });
         }
 
         // Phase 7: Generate RPG action choices for adventure mode (background, non-blocking)
-        if (!isCreativeMode) {
-          generateActionChoices(fullResponse, worldState).catch(err => {
-            log('Action choices generation failed (non-fatal)', err);
+        if (!isCreativeMode && !settings.uiSettings.disableSuggestions) {
+          generateActionChoices(fullResponse, worldState).catch((err) => {
+            log("Action choices generation failed (non-fatal)", err);
           });
         }
 
         // Phase 8: Check if style review should run (background, non-blocking)
-        checkStyleReview(countStyleReview, styleReviewSource).catch(err => {
-          log('Style review check failed (non-fatal)', err);
+        checkStyleReview(countStyleReview, styleReviewSource).catch((err) => {
+          log("Style review check failed (non-fatal)", err);
         });
       } else {
-        log(`No response content after ${MAX_EMPTY_RESPONSE_RETRIES} attempts (fullResponse was empty or whitespace)`);
+        log(
+          `No response content after ${MAX_EMPTY_RESPONSE_RETRIES} attempts (fullResponse was empty or whitespace)`,
+        );
         // Add a system message to inform the user
         const errorMessage = `The AI returned an empty response after ${MAX_EMPTY_RESPONSE_RETRIES} attempts. Please try again.`;
-        const errorEntry = await story.addEntry('system', errorMessage);
+        const errorEntry = await story.addEntry("system", errorMessage);
 
         // Store error state for retry button to work
         ui.setGenerationError({
@@ -902,14 +1046,23 @@ if (retryCount > 0) {
         });
       }
     } catch (error) {
-      if (stopRequested || (error instanceof Error && error.name === 'AbortError')) {
-        log('Generation aborted by user');
+      if (
+        stopRequested ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        log("Generation aborted by user");
         return;
       }
-      log('Generation failed', error);
-      console.error('Generation failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate response. Please try again.';
-      const errorEntry = await story.addEntry('system', `Generation failed: ${errorMessage}`);
+      log("Generation failed", error);
+      console.error("Generation failed:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to generate response. Please try again.";
+      const errorEntry = await story.addEntry(
+        "system",
+        `Generation failed: ${errorMessage}`,
+      );
 
       // Store error state for retry
       ui.setGenerationError({
@@ -923,15 +1076,23 @@ if (retryCount > 0) {
       ui.setGenerating(false);
       activeAbortController = null;
       stopRequested = false;
-      log('Generation complete, UI reset');
+      log("Generation complete, UI reset");
     }
   }
 
   async function handleSubmit() {
-    log('handleSubmit called', { inputValue: inputValue.trim(), actionType, isCreativeMode, isGenerating: ui.isGenerating });
+    log("handleSubmit called", {
+      inputValue: inputValue.trim(),
+      actionType,
+      isCreativeMode,
+      isGenerating: ui.isGenerating,
+    });
 
     if (!inputValue.trim() || ui.isGenerating) {
-      log('Submit blocked', { emptyInput: !inputValue.trim(), isGenerating: ui.isGenerating });
+      log("Submit blocked", {
+        emptyInput: !inputValue.trim(),
+        isGenerating: ui.isGenerating,
+      });
       return;
     }
 
@@ -947,26 +1108,36 @@ if (retryCount > 0) {
     // Build action content:
     // - Creative writing mode: use raw input as direction
     // - Raw action choice (from ActionChoices): use as-is (already formatted by AI)
+    // - Disable action prefixes: use raw input
     // - Adventure mode: apply action prefixes/suffixes
     const rawInput = inputValue.trim();
     const wasRawActionChoice = isRawActionChoice;
+    const forceFreeMode = settings.uiSettings.disableActionPrefixes;
+
     let content: string;
-    if (isCreativeMode || wasRawActionChoice) {
+    if (isCreativeMode || wasRawActionChoice || forceFreeMode) {
       content = rawInput;
     } else {
-      content = actionPrefixes[actionType] + rawInput + actionSuffixes[actionType];
+      content =
+        actionPrefixes[actionType] + rawInput + actionSuffixes[actionType];
     }
 
     // Reset the raw action choice flag
     isRawActionChoice = false;
 
-    log('Action content built', { content, mode: isCreativeMode ? 'creative' : 'adventure', wasRawChoice: wasRawActionChoice });
+    log("Action content built", {
+      content,
+      mode: isCreativeMode ? "creative" : "adventure",
+      wasRawChoice: wasRawActionChoice,
+    });
 
     // Create a backup of the current state BEFORE adding the user action
     // This allows "retry last message" to restore to this exact point
     if (story.currentStory) {
       // Fetch embedded images for backup (they're not in the story store)
-      const embeddedImages = await database.getEmbeddedImagesForStory(story.currentStory.id);
+      const embeddedImages = await database.getEmbeddedImagesForStory(
+        story.currentStory.id,
+      );
       ui.createRetryBackup(
         story.currentStory.id,
         story.entries,
@@ -980,19 +1151,22 @@ if (retryCount > 0) {
         rawInput,
         actionType,
         wasRawActionChoice,
-        story.currentStory.timeTracker
+        story.currentStory.timeTracker,
       );
     }
 
     // Add user action to story
-    const userActionEntry = await story.addEntry('user_action', content);
-    log('User action added to story', { entryId: userActionEntry.id });
+    const userActionEntry = await story.addEntry("user_action", content);
+    log("User action added to story", { entryId: userActionEntry.id });
 
     // Emit UserInput event
-    emitUserInput(content, isCreativeMode ? 'direction' : actionType);
+    emitUserInput(
+      content,
+      isCreativeMode ? "direction" : forceFreeMode ? "free" : actionType,
+    );
 
     // Clear input
-    inputValue = '';
+    inputValue = "";
 
     // Wait for reactive state to synchronize before generation
     // This ensures lorebook entries, characters, etc. are fully loaded
@@ -1002,8 +1176,11 @@ if (retryCount > 0) {
     if (!settings.needsApiKey) {
       await generateResponse(userActionEntry.id, content);
     } else {
-      log('No API key configured');
-      await story.addEntry('system', 'Please configure your API key in settings to enable AI generation.');
+      log("No API key configured");
+      await story.addEntry(
+        "system",
+        "Please configure your API key in settings to enable AI generation.",
+      );
     }
   }
 
@@ -1011,14 +1188,17 @@ if (retryCount > 0) {
    * Stop the active generation and restore input state.
    */
   async function handleStopGeneration() {
-    log('handleStopGeneration called', { hasBackup: !!ui.retryBackup, isGenerating: ui.isGenerating });
+    log("handleStopGeneration called", {
+      hasBackup: !!ui.retryBackup,
+      isGenerating: ui.isGenerating,
+    });
 
     if (!ui.isGenerating) {
-      log('Stop ignored (not generating)');
+      log("Stop ignored (not generating)");
       return;
     }
     if (ui.isRetryingLastMessage) {
-      log('Stop ignored (retrying completed message)');
+      log("Stop ignored (retrying completed message)");
       return;
     }
 
@@ -1030,12 +1210,12 @@ if (retryCount > 0) {
 
     const backup = ui.retryBackup;
     if (!backup || !story.currentStory) {
-      log('No valid backup for stop restore');
+      log("No valid backup for stop restore");
       return;
     }
 
     if (backup.storyId !== story.currentStory.id) {
-      log('Stop backup is for different story, clearing');
+      log("Stop backup is for different story, clearing");
       ui.clearRetryBackup();
       return;
     }
@@ -1066,11 +1246,16 @@ if (retryCount > 0) {
         // Clear activation data but don't save yet - let the next action rebuild it
         ui.clearActivationData();
 
-        log('Persistent stop restore: deleting entries from position', backup.entryCountBeforeAction);
+        log(
+          "Persistent stop restore: deleting entries from position",
+          backup.entryCountBeforeAction,
+        );
         await story.deleteEntriesFromPosition(backup.entryCountBeforeAction);
 
         if (backup.hasEntityIds) {
-          log('Persistent stop restore: deleting entities created after backup');
+          log(
+            "Persistent stop restore: deleting entities created after backup",
+          );
           await story.deleteEntitiesCreatedAfterBackup({
             characterIds: backup.characterIds,
             locationIds: backup.locationIds,
@@ -1080,7 +1265,9 @@ if (retryCount > 0) {
             embeddedImageIds: backup.embeddedImageIds,
           });
         } else {
-          log('Persistent stop restore: skipping entity cleanup (no ID snapshot)');
+          log(
+            "Persistent stop restore: skipping entity cleanup (no ID snapshot)",
+          );
         }
         await story.restoreCharacterSnapshots(backup.characterSnapshots);
 
@@ -1093,8 +1280,8 @@ if (retryCount > 0) {
       isRawActionChoice = backup.wasRawActionChoice;
       inputValue = backup.rawInput;
     } catch (error) {
-      log('Stop restore failed', error);
-      console.error('Stop restore failed:', error);
+      log("Stop restore failed", error);
+      console.error("Stop restore failed:", error);
     } finally {
       ui.clearRetryBackup(true); // Clear from DB since user explicitly stopped
     }
@@ -1104,20 +1291,31 @@ if (retryCount > 0) {
    * Retry the last failed generation
    */
   async function handleRetry() {
-    log('handleRetry called', { hasError: !!ui.lastGenerationError, isGenerating: ui.isGenerating });
+    log("handleRetry called", {
+      hasError: !!ui.lastGenerationError,
+      isGenerating: ui.isGenerating,
+    });
 
     const error = ui.lastGenerationError;
     if (!error || ui.isGenerating) {
-      log('handleRetry early return', { hasError: !!error, isGenerating: ui.isGenerating });
+      log("handleRetry early return", {
+        hasError: !!error,
+        isGenerating: ui.isGenerating,
+      });
       return;
     }
 
-    log('Retrying generation', { errorEntryId: error.errorEntryId, userActionEntryId: error.userActionEntryId });
+    log("Retrying generation", {
+      errorEntryId: error.errorEntryId,
+      userActionEntryId: error.userActionEntryId,
+    });
 
     // Find the user action content before deleting the error
-    const userActionEntry = story.entries.find(e => e.id === error.userActionEntryId);
+    const userActionEntry = story.entries.find(
+      (e) => e.id === error.userActionEntryId,
+    );
     if (!userActionEntry) {
-      log('User action entry not found for retry');
+      log("User action entry not found for retry");
       ui.clearGenerationError();
       return;
     }
@@ -1130,7 +1328,7 @@ if (retryCount > 0) {
     if (!settings.needsApiKey) {
       await generateResponse(userActionEntry.id, userActionEntry.content, {
         countStyleReview: false,
-        styleReviewSource: 'retry-error',
+        styleReviewSource: "retry-error",
       });
     }
   }
@@ -1148,7 +1346,7 @@ if (retryCount > 0) {
    * Supports both full state restore (in-memory backup) and entry-only restore (persistent backup).
    */
   async function handleRetryLastMessage() {
-    log('handleRetryLastMessage called', {
+    log("handleRetryLastMessage called", {
       hasBackup: !!ui.retryBackup,
       isGenerating: ui.isGenerating,
       storyId: story.currentStory?.id,
@@ -1156,37 +1354,37 @@ if (retryCount > 0) {
 
     const backup = ui.retryBackup;
     if (!backup || ui.isGenerating || !story.currentStory) {
-      log('handleRetryLastMessage early return');
+      log("handleRetryLastMessage early return");
       return;
     }
 
     // Verify backup is for current story
     if (backup.storyId !== story.currentStory.id) {
-      log('Backup is for different story, clearing');
+      log("Backup is for different story, clearing");
       ui.clearRetryBackup(false); // Just clear in-memory, don't touch DB
       return;
     }
 
     // Debug: Log character state before restore
-    const currentCharDescriptors = story.characters.map(c => ({
+    const currentCharDescriptors = story.characters.map((c) => ({
       name: c.name,
       visualDescriptors: [...c.visualDescriptors],
     }));
-    const backupCharDescriptors = backup.characters.map(c => ({
+    const backupCharDescriptors = backup.characters.map((c) => ({
       name: c.name,
       visualDescriptors: [...c.visualDescriptors],
     }));
-    log('RETRY DEBUG - Before restore:', {
+    log("RETRY DEBUG - Before restore:", {
       hasFullState: backup.hasFullState,
       currentCharDescriptors,
       backupCharDescriptors,
-      characterSnapshots: backup.characterSnapshots?.map(s => ({
+      characterSnapshots: backup.characterSnapshots?.map((s) => ({
         id: s.id,
         visualDescriptors: s.visualDescriptors,
       })),
     });
 
-    log('Restoring from backup and regenerating', {
+    log("Restoring from backup and regenerating", {
       hasFullState: backup.hasFullState,
       backupEntriesCount: backup.entries.length,
       entryCountBeforeAction: backup.entryCountBeforeAction,
@@ -1226,12 +1424,15 @@ if (retryCount > 0) {
         // Clear activation data but don't save yet - generation will rebuild it
         ui.clearActivationData();
 
-        log('Persistent restore: deleting entries from position', backup.entryCountBeforeAction);
+        log(
+          "Persistent restore: deleting entries from position",
+          backup.entryCountBeforeAction,
+        );
         await story.deleteEntriesFromPosition(backup.entryCountBeforeAction);
 
         if (backup.hasEntityIds) {
           // Delete entities that were created after the backup (AI extractions)
-          log('Persistent restore: deleting entities created after backup');
+          log("Persistent restore: deleting entities created after backup");
           await story.deleteEntitiesCreatedAfterBackup({
             characterIds: backup.characterIds,
             locationIds: backup.locationIds,
@@ -1241,7 +1442,7 @@ if (retryCount > 0) {
             embeddedImageIds: backup.embeddedImageIds,
           });
         } else {
-          log('Persistent restore: skipping entity cleanup (no ID snapshot)');
+          log("Persistent restore: skipping entity cleanup (no ID snapshot)");
         }
         await story.restoreCharacterSnapshots(backup.characterSnapshots);
 
@@ -1253,20 +1454,26 @@ if (retryCount > 0) {
       await tick();
 
       // Debug: Log character state after restore
-      const postRestoreCharDescriptors = story.characters.map(c => ({
+      const postRestoreCharDescriptors = story.characters.map((c) => ({
         name: c.name,
         visualDescriptors: [...c.visualDescriptors],
       }));
-      log('RETRY DEBUG - After restore:', {
+      log("RETRY DEBUG - After restore:", {
         postRestoreCharDescriptors,
       });
 
       // Re-add the user action
-      const userActionEntry = await story.addEntry('user_action', backup.userActionContent);
-      log('User action re-added', { entryId: userActionEntry.id });
+      const userActionEntry = await story.addEntry(
+        "user_action",
+        backup.userActionContent,
+      );
+      log("User action re-added", { entryId: userActionEntry.id });
 
       // Emit UserInput event
-      emitUserInput(backup.userActionContent, isCreativeMode ? 'direction' : backup.actionType);
+      emitUserInput(
+        backup.userActionContent,
+        isCreativeMode ? "direction" : backup.actionType,
+      );
 
       // Wait for state to sync again
       await tick();
@@ -1277,15 +1484,15 @@ if (retryCount > 0) {
         try {
           await generateResponse(userActionEntry.id, backup.userActionContent, {
             countStyleReview: false,
-            styleReviewSource: 'retry-last-message',
+            styleReviewSource: "retry-last-message",
           });
         } finally {
           ui.setRetryingLastMessage(false);
         }
       }
     } catch (error) {
-      log('Retry last message failed', error);
-      console.error('Retry last message failed:', error);
+      log("Retry last message failed", error);
+      console.error("Retry last message failed:", error);
     }
   }
 
@@ -1297,7 +1504,7 @@ if (retryCount > 0) {
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       handleSubmit();
     }
@@ -1307,7 +1514,9 @@ if (retryCount > 0) {
 <div class="space-y-3">
   <!-- Error retry banner -->
   {#if ui.lastGenerationError && !ui.isGenerating}
-    <div class="flex items-center justify-between gap-3 rounded-lg bg-red-500/10 border border-red-500/30 p-3">
+    <div
+      class="flex items-center justify-between gap-3 rounded-lg bg-red-500/10 border border-red-500/30 p-3"
+    >
       <div class="flex items-center gap-2 text-sm text-red-400">
         <span>Generation failed. Would you like to try again?</span>
       </div>
@@ -1330,121 +1539,145 @@ if (retryCount > 0) {
     </div>
   {/if}
 
-
   {#if isCreativeMode}
     <!-- Creative Writing Mode: Suggestions -->
-    <Suggestions
-      suggestions={ui.suggestions}
-      loading={ui.suggestionsLoading}
-      onSelect={handleSuggestionSelect}
-      onRefresh={refreshSuggestions}
-    />
+    {#if !settings.uiSettings.disableSuggestions}
+      <Suggestions
+        suggestions={ui.suggestions}
+        loading={ui.suggestionsLoading}
+        onSelect={handleSuggestionSelect}
+        onRefresh={refreshSuggestions}
+      />
+    {/if}
 
     <!-- Grammar Check -->
-    <GrammarCheck text={inputValue} onApplySuggestion={(newText) => inputValue = newText} />
+    <GrammarCheck
+      text={inputValue}
+      onApplySuggestion={(newText) => (inputValue = newText)}
+    />
 
     <!-- Creative Writing Mode: Direction Input -->
-    <div class="flex gap-2">
+    <div
+      class="group flex items-end gap-2 p-2 rounded-2xl bg-surface-800 border border-surface-700/50 border-l-4 {ui.isGenerating
+        ? 'border-l-surface-600'
+        : 'border-l-accent-500'} transition-all focus-within:border-accent-500/50"
+    >
       <div class="relative flex-1">
         <textarea
           bind:value={inputValue}
           onkeydown={handleKeydown}
-          placeholder="Describe what happens next in the story..."
-          class="input min-h-[56px] sm:min-h-[60px] resize-none text-base"
-          rows="2"
           disabled={ui.isGenerating}
+          placeholder="Describe what happens next in the story..."
+          class="w-full bg-transparent border-none focus:ring-0 px-4 py-3 min-h-[56px] resize-none text-base text-surface-200 placeholder-surface-400 focus:outline-none"
+          rows="1"
         ></textarea>
+        <!-- Character Count -->
+        <div
+          class="absolute bottom-2 right-2 text-[10px] text-surface-500 pointer-events-none opacity-0 group-focus-within:opacity-100 transition-opacity"
+        >
+          {inputValue.length}
+        </div>
       </div>
+
       {#if ui.isGenerating}
-        {#if !ui.isRetryingLastMessage}
-          <button
-            onclick={handleStopGeneration}
-            class="btn self-stretch px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px] bg-red-500/20 text-red-400 hover:bg-red-500/30"
-            title="Stop generation"
-          >
-            <Square class="h-5 w-5" />
-          </button>
-        {:else}
-          <button
-            disabled
-            class="btn self-stretch px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px] bg-red-500/20 text-red-400 opacity-50 cursor-not-allowed"
-            title="Stop disabled during retry"
-          >
-            <Square class="h-5 w-5" />
-          </button>
-        {/if}
+        <button
+          onclick={handleStopGeneration}
+          class="btn btn-primary bg-red-600 hover:bg-red-700 h-11 w-11 p-0 flex items-center justify-center rounded-xl mb-0.5 transition-transform active:scale-95"
+          title="Stop generation"
+        >
+          <Square class="h-5 w-5 fill-current" />
+        </button>
       {:else}
         <button
           onclick={handleSubmit}
-          disabled={!inputValue.trim() || ui.isGenerating}
-          class="btn btn-primary self-stretch px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px]"
-          title="Continue story"
+          disabled={!inputValue.trim()}
+          class="btn btn-primary h-11 w-11 p-0 flex items-center justify-center rounded-xl mb-0.5 transition-transform active:scale-95"
+          title="Send direction"
         >
-          <Feather class="h-5 w-5" />
+          <Send class="h-5 w-5" />
         </button>
       {/if}
     </div>
   {:else}
     <!-- Adventure Mode: Action type buttons -->
-    <div class="action-type-buttons flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'do'}
-        class:btn-secondary={actionType !== 'do'}
-        onclick={() => actionType = 'do'}
+    {#if !settings.uiSettings.disableActionPrefixes}
+      <div
+        class="action-type-buttons flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide"
       >
-        <Wand2 class="h-4 w-4" />
-        <span class="hidden xs:inline">Do</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'say'}
-        class:btn-secondary={actionType !== 'say'}
-        onclick={() => actionType = 'say'}
-      >
-        <MessageSquare class="h-4 w-4" />
-        <span class="hidden xs:inline">Say</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'think'}
-        class:btn-secondary={actionType !== 'think'}
-        onclick={() => actionType = 'think'}
-      >
-        <Brain class="h-4 w-4" />
-        <span class="hidden xs:inline">Think</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'story'}
-        class:btn-secondary={actionType !== 'story'}
-        onclick={() => actionType = 'story'}
-      >
-        <Sparkles class="h-4 w-4" />
-        <span class="hidden xs:inline">Story</span>
-      </button>
-      <button
-        class="btn flex items-center gap-1 sm:gap-1.5 text-sm flex-shrink-0 min-h-[40px] px-2.5 sm:px-4"
-        class:btn-primary={actionType === 'free'}
-        class:btn-secondary={actionType !== 'free'}
-        onclick={() => actionType = 'free'}
-      >
-        <PenLine class="h-4 w-4" />
-        <span class="hidden xs:inline">Free</span>
-      </button>
-    </div>
+        <button
+          class="btn flex items-center gap-1.5 text-sm flex-shrink-0 min-h-[36px] px-4 rounded-full font-medium transition-all active:scale-95"
+          class:btn-primary={actionType === "do"}
+          class:btn-secondary={actionType !== "do"}
+          onclick={() => (actionType = "do")}
+        >
+          <Wand2 class="h-4 w-4" />
+          <span class="hidden xs:inline">Do</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1.5 text-sm flex-shrink-0 min-h-[36px] px-4 rounded-full font-medium transition-all active:scale-95"
+          class:btn-primary={actionType === "say"}
+          class:btn-secondary={actionType !== "say"}
+          onclick={() => (actionType = "say")}
+        >
+          <MessageSquare class="h-4 w-4" />
+          <span class="hidden xs:inline">Say</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1.5 text-sm flex-shrink-0 min-h-[36px] px-4 rounded-full font-medium transition-all active:scale-95"
+          class:btn-primary={actionType === "think"}
+          class:btn-secondary={actionType !== "think"}
+          onclick={() => (actionType = "think")}
+        >
+          <Brain class="h-4 w-4" />
+          <span class="hidden xs:inline">Think</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1.5 text-sm flex-shrink-0 min-h-[36px] px-4 rounded-full font-medium transition-all active:scale-95"
+          class:btn-primary={actionType === "story"}
+          class:btn-secondary={actionType !== "story"}
+          onclick={() => (actionType = "story")}
+        >
+          <Sparkles class="h-4 w-4" />
+          <span class="hidden xs:inline">Story</span>
+        </button>
+        <button
+          class="btn flex items-center gap-1.5 text-sm flex-shrink-0 min-h-[36px] px-4 rounded-full font-medium transition-all active:scale-95"
+          class:btn-primary={actionType === "free"}
+          class:btn-secondary={actionType !== "free"}
+          onclick={() => (actionType = "free")}
+        >
+          <PenLine class="h-4 w-4" />
+          <span class="hidden xs:inline">Free</span>
+        </button>
+      </div>
+    {/if}
 
     <!-- Grammar Check -->
-    <GrammarCheck text={inputValue} onApplySuggestion={(newText) => inputValue = newText} />
+    <GrammarCheck
+      text={inputValue}
+      onApplySuggestion={(newText) => (inputValue = newText)}
+    />
 
     <!-- Adventure Mode: Input area -->
-    <div class="flex gap-2">
+    <div
+      class="flex items-end gap-2 p-2 rounded-2xl bg-surface-800 border border-surface-700/50 border-l-4 {ui.isGenerating
+        ? 'border-l-surface-600'
+        : 'border-l-accent-500'} transition-all focus-within:border-accent-500/50"
+    >
       <div class="relative flex-1">
         <textarea
           bind:value={inputValue}
           onkeydown={handleKeydown}
-          placeholder={actionType === 'story' ? 'Describe what happens...' : actionType === 'free' ? 'Write anything...' : 'What do you do?'}
-          class="input min-h-[56px] sm:min-h-[60px] resize-none text-base"
+          placeholder={actionType === "story"
+            ? "Describe what happens..."
+            : actionType === "say"
+              ? "What do you say?"
+              : actionType === "think"
+                ? "What are you thinking?"
+                : actionType === "free"
+                  ? "Write anything..."
+                  : "What do you do?"}
+          class="w-full bg-transparent border-none focus:ring-0 px-4 py-3 min-h-[56px] sm:min-h-[60px] resize-none text-base text-surface-200 placeholder-surface-400 focus:outline-none"
           rows="2"
           disabled={ui.isGenerating}
         ></textarea>
@@ -1453,7 +1686,7 @@ if (retryCount > 0) {
         {#if !ui.isRetryingLastMessage}
           <button
             onclick={handleStopGeneration}
-            class="btn self-stretch px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px] bg-red-500/20 text-red-400 hover:bg-red-500/30"
+            class="btn h-11 w-11 p-0 flex items-center justify-center rounded-xl mb-0.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-transform active:scale-95"
             title="Stop generation"
           >
             <Square class="h-5 w-5" />
@@ -1461,7 +1694,7 @@ if (retryCount > 0) {
         {:else}
           <button
             disabled
-            class="btn self-stretch px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px] bg-red-500/20 text-red-400 opacity-50 cursor-not-allowed"
+            class="btn h-11 w-11 p-0 flex items-center justify-center rounded-xl mb-0.5 bg-red-500/20 text-red-400 opacity-50 cursor-not-allowed shadow-none"
             title="Stop disabled during retry"
           >
             <Square class="h-5 w-5" />
@@ -1471,7 +1704,7 @@ if (retryCount > 0) {
         <button
           onclick={handleSubmit}
           disabled={!inputValue.trim() || ui.isGenerating}
-          class="btn btn-primary self-stretch px-3 sm:px-4 py-3 min-h-[44px] min-w-[44px]"
+          class="btn btn-primary h-11 w-11 p-0 flex items-center justify-center rounded-xl mb-0.5 transition-transform active:scale-95"
         >
           <Send class="h-5 w-5" />
         </button>
@@ -1485,12 +1718,13 @@ if (retryCount > 0) {
         onclick={handleManualImageGeneration}
         disabled={manualImageGenDisabled}
         class="btn btn-secondary text-xs flex items-center gap-1.5"
-        title={manualImageGenDisabled && !settings.systemServicesSettings.imageGeneration.nanoGptApiKey
-          ? 'Add a NanoGPT API key in Settings to generate images'
-          : 'Generate images for the last narration'}
+        title={manualImageGenDisabled &&
+        !settings.systemServicesSettings.imageGeneration.nanoGptApiKey
+          ? "Add a NanoGPT API key in Settings to generate images"
+          : "Generate images for the last narration"}
       >
         <ImageIcon class="h-4 w-4" />
-        {isManualImageGenRunning ? 'Generating...' : 'Generate Images'}
+        {isManualImageGenRunning ? "Generating..." : "Generate Images"}
       </button>
     </div>
   {/if}

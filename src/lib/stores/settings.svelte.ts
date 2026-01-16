@@ -1175,6 +1175,8 @@ class SettingsStore {
     autoSave: true,
     spellcheckEnabled: true,
     debugMode: false,
+    disableSuggestions: false,
+    disableActionPrefixes: false,
   });
 
   advancedRequestSettings = $state<AdvancedRequestSettings>(getDefaultAdvancedRequestSettings());
@@ -1334,6 +1336,12 @@ class SettingsStore {
       if (showWordCount) this.uiSettings.showWordCount = showWordCount === 'true';
       if (autoSave) this.uiSettings.autoSave = autoSave === 'true';
       if (spellcheckEnabled !== null) this.uiSettings.spellcheckEnabled = spellcheckEnabled === 'true';
+
+      const disableSuggestions = await database.getSetting('disable_suggestions');
+      if (disableSuggestions !== null) this.uiSettings.disableSuggestions = disableSuggestions === 'true';
+
+      const disableActionPrefixes = await database.getSetting('disable_action_prefixes');
+      if (disableActionPrefixes !== null) this.uiSettings.disableActionPrefixes = disableActionPrefixes === 'true';
 
       const debugMode = await database.getSetting('debug_mode');
       if (debugMode !== null) this.uiSettings.debugMode = debugMode === 'true';
@@ -2085,6 +2093,16 @@ class SettingsStore {
     await database.setSetting('spellcheck_enabled', enabled.toString());
   }
 
+  async setDisableSuggestions(enabled: boolean) {
+    this.uiSettings.disableSuggestions = enabled;
+    await database.setSetting('disable_suggestions', enabled.toString());
+  }
+
+  async setDisableActionPrefixes(enabled: boolean) {
+    this.uiSettings.disableActionPrefixes = enabled;
+    await database.setSetting('disable_action_prefixes', enabled.toString());
+  }
+
   async setDebugMode(enabled: boolean) {
     this.uiSettings.debugMode = enabled;
     await database.setSetting('debug_mode', enabled.toString());
@@ -2328,6 +2346,8 @@ class SettingsStore {
       autoSave: true,
       spellcheckEnabled: true,
       debugMode: false,
+      disableSuggestions: false,
+      disableActionPrefixes: false,
     };
 
     // Reset font to default
@@ -2364,6 +2384,8 @@ class SettingsStore {
     await database.setSetting('auto_save', this.uiSettings.autoSave.toString());
     await database.setSetting('spellcheck_enabled', this.uiSettings.spellcheckEnabled.toString());
     await database.setSetting('debug_mode', this.uiSettings.debugMode.toString());
+    await database.setSetting('disable_suggestions', this.uiSettings.disableSuggestions.toString());
+    await database.setSetting('disable_action_prefixes', this.uiSettings.disableActionPrefixes.toString());
     await database.setSetting('advanced_manual_mode', this.advancedRequestSettings.manualMode.toString());
     await this.saveWizardSettings();
     await this.saveStoryGenerationSettings();
