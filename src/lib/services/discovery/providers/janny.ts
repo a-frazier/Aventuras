@@ -1,5 +1,5 @@
 import type { DiscoveryProvider, DiscoveryCard, SearchOptions, SearchResult } from '../types';
-import { corsFetch } from '../utils';
+import { corsFetch, GENERIC_ICON } from '../utils';
 
 const JANNY_SEARCH_URL = 'https://search.jannyai.com/multi-search';
 const JANNY_IMAGE_BASE = 'https://image.jannyai.com/bot-avatars/';
@@ -61,7 +61,7 @@ async function getSearchToken(): Promise<string> {
 export class JannyProvider implements DiscoveryProvider {
   id = 'janny';
   name = 'JannyAI';
-  icon = 'https://tse3.mm.bing.net/th/id/OIP.nb-qi0od9W6zRsskVwL6QAHaHa';
+  icon = GENERIC_ICON;
   supports: ('character' | 'lorebook' | 'scenario')[] = ['character', 'scenario'];
 
   async search(options: SearchOptions, type: 'character' | 'lorebook' | 'scenario'): Promise<SearchResult> {

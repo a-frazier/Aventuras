@@ -1,6 +1,13 @@
 import type { DiscoveryProvider, DiscoveryCard, SearchOptions, SearchResult } from './types';
 import { ChubProvider } from './providers/chub';
 import { JannyProvider } from './providers/janny';
+import { BackyardProvider } from './providers/backyard';
+import { CharacterTavernProvider } from './providers/characterTavern';
+import { RisuRealmProvider } from './providers/risuRealm';
+import { WyvernProvider } from './providers/wyvern';
+import { PygmalionProvider } from './providers/pygmalion';
+import { MlpchagProvider } from './providers/mlpchag';
+import { QuillGenProvider } from './providers/quillgen';
 
 export type { DiscoveryProvider, DiscoveryCard, SearchOptions, SearchResult };
 
@@ -18,6 +25,13 @@ class DiscoveryService {
   constructor() {
     this.registerProvider(new ChubProvider());
     this.registerProvider(new JannyProvider());
+    this.registerProvider(new BackyardProvider());
+    this.registerProvider(new CharacterTavernProvider());
+    this.registerProvider(new RisuRealmProvider());
+    this.registerProvider(new WyvernProvider());
+    this.registerProvider(new PygmalionProvider());
+    this.registerProvider(new MlpchagProvider());
+    this.registerProvider(new QuillGenProvider());
   }
 
   registerProvider(provider: DiscoveryProvider): void {
