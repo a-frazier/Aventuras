@@ -192,6 +192,7 @@ export interface VaultLorebookMetadata {
   format: 'aventura' | 'sillytavern' | 'unknown';
   totalEntries: number;
   entryBreakdown: Record<EntryType, number>;
+  [key: string]: unknown;
 }
 
 /**
@@ -235,6 +236,61 @@ export interface VaultLorebookEntry {
   priority: number;
   disabled: boolean;
   group: string | null;
+}
+
+// ===== Scenario Vault Types =====
+
+export type VaultScenarioSource = 'import' | 'wizard' | 'manual';
+
+export interface VaultScenarioNpc {
+  name: string;
+  role: string;
+  description: string;
+  relationship: string;
+  traits: string[];
+}
+
+export interface VaultScenarioMetadata {
+  cardVersion?: string;
+  sourceUrl?: string;
+  importing?: boolean;
+  hasFirstMessage?: boolean;
+  alternateGreetingsCount?: number;
+  npcCount?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * A reusable scenario stored in the global vault.
+ * Contains setting, NPCs, and opening scene data extracted from character cards.
+ */
+export interface VaultScenario {
+  id: string;
+  name: string;
+  description: string | null;  // Summary/preview of the scenario
+  
+  // Core content (from CardImportResult)
+  settingSeed: string;
+  npcs: VaultScenarioNpc[];
+  primaryCharacterName: string;
+  
+  // Opening scene data
+  firstMessage: string | null;
+  alternateGreetings: string[];
+  
+  // Organization
+  tags: string[];
+  favorite: boolean;
+  
+  // Provenance
+  source: VaultScenarioSource;
+  originalFilename: string | null;
+  
+  // Metadata
+  metadata: VaultScenarioMetadata | null;
+  
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Location {

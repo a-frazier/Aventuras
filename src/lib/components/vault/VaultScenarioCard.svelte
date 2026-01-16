@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { VaultLorebook, EntryType } from '$lib/types';
-  import { Star, Pencil, Trash2, Archive, Users, MapPin, Box, Flag, Brain, Calendar, Loader2 } from 'lucide-svelte';
+  import type { VaultScenario } from '$lib/types';
+  import { Star, Pencil, Trash2, MapPin, Users, MessageSquare, Loader2 } from 'lucide-svelte';
 
   interface Props {
-    lorebook: VaultLorebook;
+    scenario: VaultScenario;
     onEdit?: () => void;
     onDelete?: () => void;
     onToggleFavorite?: () => void;
@@ -11,10 +11,10 @@
     onSelect?: () => void;
   }
 
-  let { lorebook, onEdit, onDelete, onToggleFavorite, selectable = false, onSelect }: Props = $props();
+  let { scenario, onEdit, onDelete, onToggleFavorite, selectable = false, onSelect }: Props = $props();
 
   let confirmingDelete = $state(false);
-  let isImporting = $derived(lorebook.metadata?.importing === true);
+  let isImporting = $derived(scenario.metadata?.importing === true);
 
   function handleCardClick() {
     if (isImporting) return;
@@ -40,24 +40,6 @@
     e.stopPropagation();
     confirmingDelete = true;
   }
-
-  // Icons for entry types
-  const typeIcons: Record<EntryType, any> = {
-    character: Users,
-    location: MapPin,
-    item: Box,
-    faction: Flag,
-    concept: Brain,
-    event: Calendar,
-  };
-
-  // Helper to get non-zero entry counts
-  const entryCounts = $derived.by(() => {
-    if (!lorebook.metadata?.entryBreakdown) return [];
-    return Object.entries(lorebook.metadata.entryBreakdown)
-      .filter(([_, count]) => count > 0)
-      .map(([type, count]) => ({ type: type as EntryType, count }));
-  });
 </script>
 
 <div
@@ -77,44 +59,49 @@
   <div class="flex items-start gap-3">
     <!-- Icon -->
     <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-surface-700 flex-shrink-0">
-      <Archive class="h-6 w-6 text-accent-400" />
+      <MapPin class="h-6 w-6 text-green-400" />
     </div>
 
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
-        <h3 class="font-medium text-surface-100 truncate">{lorebook.name}</h3>
-        {#if lorebook.favorite}
+        <h3 class="font-medium text-surface-100 truncate">{scenario.name}</h3>
+        {#if scenario.favorite}
           <Star class="h-4 w-4 text-yellow-400 fill-yellow-400 flex-shrink-0" />
         {/if}
       </div>
 
-      <div class="flex items-center gap-2 mt-1">
-        <span class="text-xs text-surface-400">
-          {lorebook.entries.length} entries
-        </span>
-        {#if lorebook.source === 'story'}
-          <span class="text-xs text-surface-500">• From Story</span>
-        {:else if lorebook.source === 'import'}
+      <div class="flex items-center gap-2 mt-1 flex-wrap">
+        {#if scenario.npcs.length > 0}
+          <span class="flex items-center gap-1 text-xs text-surface-400">
+            <Users class="h-3 w-3" />
+            {scenario.npcs.length} NPCs
+          </span>
+        {/if}
+        {#if scenario.firstMessage}
+          <span class="flex items-center gap-1 text-xs text-surface-400">
+            <MessageSquare class="h-3 w-3" />
+            Opening
+          </span>
+        {/if}
+        {#if scenario.source === 'wizard'}
+          <span class="text-xs text-surface-500">• Created</span>
+        {:else if scenario.source === 'import'}
           <span class="text-xs text-surface-500">• Imported</span>
         {/if}
       </div>
 
-      {#if lorebook.description}
-        <p class="mt-2 text-sm text-surface-400 line-clamp-2">{lorebook.description}</p>
+      {#if scenario.description}
+        <p class="mt-2 text-sm text-surface-400 line-clamp-2">{scenario.description}</p>
       {/if}
 
-      <!-- Entry Type Breakdown -->
-      {#if entryCounts.length > 0}
-        <div class="mt-3 flex flex-wrap gap-2">
-          {#each entryCounts.slice(0, 4) as { type, count }}
-            {@const Icon = typeIcons[type]}
-            <div class="flex items-center gap-1 rounded bg-surface-700 px-1.5 py-0.5 text-xs text-surface-400" title="{type}">
-              <Icon class="h-3 w-3" />
-              <span>{count}</span>
-            </div>
+      <!-- Tags -->
+      {#if scenario.tags.length > 0}
+        <div class="mt-2 flex flex-wrap gap-1">
+          {#each scenario.tags.slice(0, 3) as tag}
+            <span class="rounded bg-surface-700 px-1.5 py-0.5 text-xs text-surface-400">{tag}</span>
           {/each}
-          {#if entryCounts.length > 4}
-             <span class="text-xs text-surface-500 self-center">+{entryCounts.length - 4}</span>
+          {#if scenario.tags.length > 3}
+            <span class="text-xs text-surface-500">+{scenario.tags.length - 3}</span>
           {/if}
         </div>
       {/if}
@@ -142,9 +129,9 @@
           <button
             class="rounded p-1.5 hover:bg-surface-700"
             onclick={(e) => { e.stopPropagation(); onToggleFavorite?.(); }}
-            title={lorebook.favorite ? 'Remove from favorites' : 'Add to favorites'}
+            title={scenario.favorite ? 'Remove from favorites' : 'Add to favorites'}
           >
-            <Star class="h-4 w-4 {lorebook.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-surface-500'}" />
+            <Star class="h-4 w-4 {scenario.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-surface-500'}" />
           </button>
         {/if}
         {#if onEdit}

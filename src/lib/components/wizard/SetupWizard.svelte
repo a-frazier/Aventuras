@@ -29,10 +29,12 @@
   import { NanoGPTImageProvider } from "$lib/services/ai/nanoGPTImageProvider";
   import { promptService } from "$lib/services/prompts";
   import { normalizeImageDataUrl } from "$lib/utils/image";
-  import type { StoryMode, POV, EntryType, VaultCharacter, VaultLorebook, VaultLorebookEntry } from "$lib/types";
+  import type { StoryMode, POV, EntryType, VaultCharacter, VaultLorebook, VaultLorebookEntry, VaultScenario } from "$lib/types";
   import VaultCharacterPicker from "$lib/components/vault/VaultCharacterPicker.svelte";
   import VaultLorebookPicker from "$lib/components/vault/VaultLorebookPicker.svelte";
+  import VaultScenarioPicker from "$lib/components/vault/VaultScenarioPicker.svelte";
   import { lorebookVault } from '$lib/stores/lorebookVault.svelte';
+  import { scenarioVault } from '$lib/stores/scenarioVault.svelte';
   import {
     X,
     ChevronLeft,
@@ -178,6 +180,10 @@
   let cardImportedFirstMessage = $state<string | null>(null);
   let cardImportedAlternateGreetings = $state<string[]>([]);
   let selectedGreetingIndex = $state<number>(0); // 0 = first_mes, 1+ = alternate greetings
+
+  // Scenario Vault integration (Step 4)
+  let showScenarioVaultPicker = $state(false);
+  let savedScenarioToVaultConfirm = $state(false);
 
   // Step 6: Writing Style
   let selectedPOV = $state<POV>("first");
@@ -792,6 +798,20 @@
   async function createStory() {
     // Sanity checks
     if (!storyTitle.trim()) return;
+    
+    // Allow proceeding if we have a card-imported opening, even if not generated
+    // Construct a generatedOpening object from the card data if needed
+    if (!generatedOpening && cardImportedFirstMessage) {
+      generatedOpening = {
+        scene: cardImportedFirstMessage,
+        title: cardImportedTitle || storyTitle || "Untitled Story",
+        initialLocation: {
+          name: "Starting Location",
+          description: "The place where your journey begins."
+        }
+      };
+    }
+
     if (!generatedOpening) {
       openingError = "Please generate an opening scene first";
       return;
@@ -800,21 +820,60 @@
     // Get protagonist name for {{user}} replacement
     const protagonistName = protagonist?.name || "the protagonist";
 
-    // Replace {{user}} placeholders in the opening scene
+    // --- Data Pre-processing: Replace {{user}} placeholders ---
+
+    // 1. Setting Seed
+    const processedSettingSeed = replaceUserPlaceholders(settingSeed, protagonistName);
+
+    // 2. Expanded Setting
+    let processedExpandedSetting: ExpandedSetting | null = null;
+    if (expandedSetting) {
+      processedExpandedSetting = {
+        ...expandedSetting,
+        description: replaceUserPlaceholders(expandedSetting.description, protagonistName),
+        keyLocations: expandedSetting.keyLocations.map(l => ({
+          ...l,
+          description: replaceUserPlaceholders(l.description, protagonistName)
+        })),
+        atmosphere: replaceUserPlaceholders(expandedSetting.atmosphere, protagonistName),
+        themes: expandedSetting.themes.map(t => replaceUserPlaceholders(t, protagonistName)),
+        potentialConflicts: expandedSetting.potentialConflicts.map(c => replaceUserPlaceholders(c, protagonistName))
+      };
+    }
+
+    // 3. Opening Scene
     const processedOpening = {
       ...generatedOpening,
-      scene: generatedOpening.scene.replace(/\{\{user\}\}/gi, protagonistName),
+      scene: replaceUserPlaceholders(generatedOpening.scene, protagonistName),
     };
+
+    // 4. Supporting Characters
+    const processedCharacters = supportingCharacters.map(char => ({
+      ...char,
+      name: replaceUserPlaceholders(char.name, protagonistName),
+      description: replaceUserPlaceholders(char.description, protagonistName),
+      role: replaceUserPlaceholders(char.role, protagonistName),
+      relationship: replaceUserPlaceholders(char.relationship, protagonistName),
+      traits: char.traits?.map(t => replaceUserPlaceholders(t, protagonistName))
+    }));
+
+    // 5. Imported Lorebook Entries
+    // We map importedEntries to a new array to avoid mutating the source state if user cancels
+    const processedEntries = importedEntries.map(e => ({
+      ...e,
+      name: replaceUserPlaceholders(e.name, protagonistName),
+      description: replaceUserPlaceholders(e.description, protagonistName),
+      keywords: e.keywords.map(k => replaceUserPlaceholders(k, protagonistName))
+    }));
 
     const wizardData: WizardData = {
       mode: selectedMode,
       genre: selectedGenre,
       customGenre: customGenre || undefined,
-      settingSeed: settingSeed.replace(/\{\{user\}\}/gi, protagonistName),
-      expandedSetting: expandedSetting || undefined,
+      settingSeed: processedSettingSeed,
+      expandedSetting: processedExpandedSetting || undefined,
       protagonist: protagonist || undefined,
-      characters:
-        supportingCharacters.length > 0 ? supportingCharacters : undefined,
+      characters: processedCharacters.length > 0 ? processedCharacters : undefined,
       writingStyle: {
         pov: selectedPOV,
         tense: selectedTense,
@@ -864,7 +923,7 @@
     // Create the story using the store, including any imported entries
     const newStory = await story.createStoryFromWizard({
       ...storyData,
-      importedEntries: importedEntries.length > 0 ? importedEntries : undefined,
+      importedEntries: processedEntries.length > 0 ? processedEntries : undefined,
     });
 
     // Load and navigate to the story
@@ -1298,6 +1357,89 @@
     }
   }
 
+  // Scenario Vault Handler
+  function handleSelectScenarioFromVault(scenario: VaultScenario) {
+    // Populate setting seed
+    settingSeed = scenario.settingSeed;
+    expandedSetting = null; // Clear expanded setting since we have a new seed
+
+    // Add NPCs to supporting characters
+    const importedNpcs: GeneratedCharacter[] = scenario.npcs.map(npc => ({
+      name: npc.name,
+      role: npc.role,
+      description: npc.description,
+      relationship: npc.relationship,
+      traits: npc.traits || [],
+    }));
+
+    // Add to supporting characters (replacing any previous imported NPCs)
+    if (importedCardNpcs.length > 0) {
+      const prevImportedNames = new Set(importedCardNpcs.map(n => n.name));
+      supportingCharacters = supportingCharacters.filter(c => !prevImportedNames.has(c.name));
+    }
+    
+    supportingCharacters = [...supportingCharacters, ...importedNpcs];
+    importedCardNpcs = importedNpcs;
+
+    // Set opening scene data for step 7
+    if (scenario.name) {
+      cardImportedTitle = scenario.name;
+      storyTitle = scenario.name;
+    }
+    
+    if (scenario.firstMessage) {
+      cardImportedFirstMessage = scenario.firstMessage;
+      cardImportedAlternateGreetings = scenario.alternateGreetings || [];
+      selectedGreetingIndex = 0;
+    } else {
+      cardImportedFirstMessage = null;
+      cardImportedAlternateGreetings = [];
+    }
+
+    showScenarioVaultPicker = false;
+  }
+
+  async function handleSaveScenarioToVault() {
+    if (!settingSeed.trim()) return;
+
+    // Ensure vault is loaded
+    if (!scenarioVault.isLoaded) {
+      await scenarioVault.load();
+    }
+
+    const npcs = importedCardNpcs.length > 0 ? importedCardNpcs : supportingCharacters.map(c => ({
+      name: c.name,
+      role: c.role,
+      description: c.description,
+      relationship: c.relationship,
+      traits: c.traits || [],
+    }));
+
+    // Convert GeneratedCharacter to VaultScenarioNpc
+    const vaultNpcs = npcs.map(c => ({
+      name: c.name,
+      role: c.role,
+      description: c.description,
+      relationship: c.relationship,
+      traits: c.traits || []
+    }));
+
+    await scenarioVault.saveFromWizard(
+      storyTitle || 'Untitled Scenario',
+      settingSeed,
+      vaultNpcs,
+      {
+        description: expandedSetting?.description,
+        firstMessage: cardImportedFirstMessage || undefined,
+        alternateGreetings: cardImportedAlternateGreetings,
+        tags: ['wizard'],
+      }
+    );
+
+    savedScenarioToVaultConfirm = true;
+    setTimeout(() => savedScenarioToVaultConfirm = false, 2000);
+  }
+
   // Character Card Import handler
   async function handleCardImport(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -1407,6 +1549,12 @@
       /\{\{user\}\}/gi,
       '<span class="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded bg-primary-600/30 text-primary-300 text-xs font-mono border border-primary-500/40">{{user}}</span>',
     );
+  }
+
+  // Helper to replace {{user}} placeholders with actual name
+  function replaceUserPlaceholders(text: string, name: string): string {
+    if (!text) return text;
+    return text.replace(/\{\{user\}\}/gi, name);
   }
 
 
@@ -1835,66 +1983,93 @@
       {:else if currentStep === 4}
         <!-- Step 4: Setting -->
         <div class="space-y-4">
+          <!-- Vault Picker Modal -->
+          {#if showScenarioVaultPicker}
+            <VaultScenarioPicker
+              onSelect={handleSelectScenarioFromVault}
+              onClose={() => showScenarioVaultPicker = false}
+            />
+          {/if}
+
           <p class="text-surface-400">
             Describe your world in a few sentences. The AI will expand it into a
             rich setting.
           </p>
 
-          <!-- Character Card Import -->
-          <div class="card bg-surface-800/50 p-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <FileJson class="h-4 w-4 text-surface-400" />
-                <span class="text-sm font-medium text-surface-300"
-                  >Import Character Card</span
-                >
-                <span class="text-xs text-surface-500">(Optional)</span>
-              </div>
-              {#if importedCardNpcs.length > 0}
-                <button
-                  class="text-xs text-surface-400 hover:text-surface-200"
-                  onclick={clearCardImport}
-                >
-                  Clear
-                </button>
-              {/if}
-            </div>
-            <p class="text-xs text-surface-500">
-              Import a SillyTavern character card (.json or .png) to generate a
-              setting with the character as an NPC.
-            </p>
-            <div class="flex items-center gap-2">
+          <!-- Import Options Row -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <!-- Import Character Card (existing) -->
+            <div
+              class="card bg-surface-900 border-dashed border-2 border-surface-600 p-4 text-center hover:border-accent-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[100px]"
+              onclick={() => cardImportFileInput?.click()}
+              role="button"
+              tabindex="0"
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') cardImportFileInput?.click(); }}
+            >
               <input
                 type="file"
-                accept=".json,.png,application/json,image/png"
+                accept=".json,.png"
                 class="hidden"
                 bind:this={cardImportFileInput}
                 onchange={handleCardImport}
               />
-              <button
-                class="btn btn-secondary btn-sm flex items-center gap-2"
-                onclick={() => cardImportFileInput?.click()}
-                disabled={isImportingCard}
-              >
-                {#if isImportingCard}
-                  <Loader2 class="h-3 w-3 animate-spin" />
-                  Converting...
-                {:else}
-                  <Upload class="h-3 w-3" />
-                  Select Card
-                {/if}
-              </button>
-              {#if importedCardNpcs.length > 0}
-                <span class="text-xs text-green-400 flex items-center gap-1">
-                  <Check class="h-3 w-3" />
-                  Imported: {importedCardNpcs.map((n) => n.name).join(", ")}
-                </span>
+              {#if isImportingCard}
+                <Loader2 class="h-6 w-6 mb-2 text-surface-500 animate-spin" />
+                <p class="text-surface-300 text-sm font-medium">Converting...</p>
+              {:else}
+                <Upload class="h-6 w-6 mb-2 text-surface-500" />
+                <p class="text-surface-300 text-sm font-medium">Import Card</p>
+                <p class="text-xs text-surface-500">JSON or PNG</p>
               {/if}
             </div>
-            {#if cardImportError}
-              <p class="text-xs text-red-400">{cardImportError}</p>
+
+            <!-- Load from Vault (NEW) -->
+            <button
+              class="card bg-surface-900 border-dashed border-2 border-surface-600 p-4 text-center hover:border-accent-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[100px]"
+              onclick={() => showScenarioVaultPicker = true}
+            >
+              <Archive class="h-6 w-6 mb-2 text-surface-500" />
+              <p class="text-surface-300 text-sm font-medium">Load from Vault</p>
+              <p class="text-xs text-surface-500">Saved scenarios</p>
+            </button>
+
+            <!-- Save to Vault (NEW - show when content exists) -->
+            {#if settingSeed.trim()}
+              <button
+                class="card bg-surface-900 border-dashed border-2 border-surface-600 p-4 text-center hover:border-green-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[100px] {savedScenarioToVaultConfirm ? 'border-green-500/50 bg-green-500/10' : ''}"
+                onclick={handleSaveScenarioToVault}
+                disabled={savedScenarioToVaultConfirm}
+              >
+                {#if savedScenarioToVaultConfirm}
+                  <Check class="h-6 w-6 mb-2 text-green-400" />
+                  <p class="text-green-300 text-sm font-medium">Saved!</p>
+                {:else}
+                  <Archive class="h-6 w-6 mb-2 text-surface-500" />
+                  <p class="text-surface-300 text-sm font-medium">Save to Vault</p>
+                  <p class="text-xs text-surface-500">For later use</p>
+                {/if}
+              </button>
             {/if}
           </div>
+
+          <!-- Import Status / Error -->
+          {#if importedCardNpcs.length > 0}
+            <div class="flex items-center justify-between bg-surface-800/50 p-2 rounded text-xs">
+              <span class="text-green-400 flex items-center gap-1">
+                <Check class="h-3 w-3" />
+                Imported: {importedCardNpcs.map((n) => n.name).join(", ")}
+              </span>
+              <button
+                class="text-surface-400 hover:text-surface-200"
+                onclick={clearCardImport}
+              >
+                Clear
+              </button>
+            </div>
+          {/if}
+          {#if cardImportError}
+            <p class="text-xs text-red-400 text-center">{cardImportError}</p>
+          {/if}
 
           <div>
             <label class="mb-2 block text-sm font-medium text-surface-300">
