@@ -1,21 +1,23 @@
 <script lang="ts">
   import { characterVault } from '$lib/stores/characterVault.svelte';
   import { lorebookVault } from '$lib/stores/lorebookVault.svelte';
+  import { scenarioVault } from '$lib/stores/scenarioVault.svelte';
   import { ui } from '$lib/stores/ui.svelte';
-  import type { VaultCharacter, VaultCharacterType, VaultLorebook } from '$lib/types';
+  import type { VaultCharacter, VaultCharacterType, VaultLorebook, VaultScenario } from '$lib/types';
   import {
-    Plus, Search, Star, User, Users, ChevronLeft, Upload, Loader2, Archive, Book
+    Plus, Search, Star, User, Users, ChevronLeft, Upload, Loader2, Archive, Book, Globe, MapPin
   } from 'lucide-svelte';
   import VaultCharacterCard from './VaultCharacterCard.svelte';
   import VaultCharacterForm from './VaultCharacterForm.svelte';
   import VaultLorebookCard from './VaultLorebookCard.svelte';
   import VaultLorebookEditor from './VaultLorebookEditor.svelte';
-  import { readCharacterCardFile, parseCharacterCard } from '$lib/services/characterCardImporter';
-  import { parseLorebook, classifyEntriesWithLLM, type ImportedEntry } from '$lib/services/lorebookImporter';
+  import VaultScenarioCard from './VaultScenarioCard.svelte';
+  import VaultScenarioEditor from './VaultScenarioEditor.svelte';
+  import DiscoveryModal from '$lib/components/discovery/DiscoveryModal.svelte';
   import { fade } from 'svelte/transition';
 
   // Types
-  type VaultTab = 'characters' | 'lorebooks';
+  type VaultTab = 'characters' | 'lorebooks' | 'scenarios';
 
   // State
   let activeTab = $state<VaultTab>('characters');
@@ -27,14 +29,19 @@
   let showCharForm = $state(false);
   let editingCharacter = $state<VaultCharacter | null>(null);
   let defaultCharFormType = $state<VaultCharacterType>('protagonist');
-  let importingChar = $state(false);
   let importCharError = $state<string | null>(null);
 
   // Lorebook State
-  let importingLorebook = $state(false);
   let importLorebookError = $state<string | null>(null);
-  let importProgress = $state({ current: 0, total: 0 });
   let editingLorebook = $state<VaultLorebook | null>(null);
+
+  // Scenario State
+  let importScenarioError = $state<string | null>(null);
+  let editingScenario = $state<VaultScenario | null>(null);
+
+  // Discovery Modal State
+  let showDiscoveryModal = $state(false);
+  let discoveryMode = $state<'character' | 'lorebook' | 'scenario'>('character');
 
   // Derived: Filtered Characters
   const filteredCharacters = $derived.by(() => {
@@ -81,10 +88,31 @@
     return books;
   });
 
+  // Derived: Filtered Scenarios
+  const filteredScenarios = $derived.by(() => {
+    let items = scenarioVault.scenarios;
+
+    if (showFavoritesOnly) {
+      items = items.filter(s => s.favorite);
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      items = items.filter(s =>
+        s.name.toLowerCase().includes(query) ||
+        s.description?.toLowerCase().includes(query) ||
+        s.tags.some(t => t.toLowerCase().includes(query))
+      );
+    }
+
+    return items;
+  });
+
   // Load on mount
   $effect(() => {
     if (!characterVault.isLoaded) characterVault.load();
     if (!lorebookVault.isLoaded) lorebookVault.load();
+    if (!scenarioVault.isLoaded) scenarioVault.load();
   });
 
   // Character Handlers
@@ -112,42 +140,13 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    importingChar = true;
-    importCharError = null;
-
+    // Fire and forget (store handles loading state via placeholder)
     try {
-      const jsonString = await readCharacterCardFile(file);
-      const card = parseCharacterCard(jsonString);
-
-      if (!card) throw new Error('Invalid character card format');
-
-      const traits = card.personality
-        ? card.personality.split(/[,;]/).map(t => t.trim()).filter(Boolean).slice(0, 10)
-        : [];
-
-      await characterVault.add({
-        name: card.name,
-        description: card.description || null,
-        characterType: 'supporting',
-        background: null,
-        motivation: null,
-        role: null,
-        relationshipTemplate: null,
-        traits,
-        visualDescriptors: [],
-        portrait: null,
-        tags: ['imported'],
-        favorite: false,
-        source: 'import',
-        originalStoryId: null,
-        metadata: { cardVersion: card.version },
-      });
-
+      await characterVault.importFromFile(file);
     } catch (error) {
       console.error('[CharacterVault] Import failed:', error);
       importCharError = error instanceof Error ? error.message : 'Failed to import character card';
     } finally {
-      importingChar = false;
       input.value = '';
     }
   }
@@ -158,47 +157,13 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    importingLorebook = true;
-    importLorebookError = null;
-    importProgress = { current: 0, total: 0 };
-
+    // Fire and forget (store handles loading state via placeholder)
     try {
-      const content = await file.text();
-      const result = parseLorebook(content);
-
-      if (!result.success || result.entries.length === 0) {
-        throw new Error(result.errors.join('; ') || 'No entries found in lorebook');
-      }
-
-      // Classify entries
-      const entries = await classifyEntriesWithLLM(
-        result.entries,
-        (current, total) => {
-          importProgress = { current, total };
-        },
-        'adventure' // Default mode for classification context
-      );
-
-      // Convert ImportedEntry[] to VaultLorebookEntry[]
-      // We can cast or map. Since structure matches except optional/extra fields:
-      const vaultEntries = entries.map(e => {
-        const { originalData, ...rest } = e;
-        return rest;
-      });
-
-      // Save to vault
-      await lorebookVault.saveFromImport(
-        file.name.replace(/\.json$/i, ''),
-        vaultEntries,
-        { ...result, entries }, // Update result with classified entries
-        file.name
-      );
-
+      await lorebookVault.importFromFile(file);
     } catch (error) {
       console.error('[VaultPanel] Lorebook import failed:', error);
       importLorebookError = error instanceof Error ? error.message : 'Failed to import lorebook';
     } finally {
-      importingLorebook = false;
       input.value = '';
     }
   }
@@ -241,6 +206,39 @@
     });
     editingLorebook = newLorebook;
   }
+
+  // Scenario Handlers
+  async function handleImportScenario(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    try {
+      await scenarioVault.importFromFile(file);
+    } catch (error) {
+      console.error('[VaultPanel] Scenario import failed:', error);
+      importScenarioError = error instanceof Error ? error.message : 'Failed to import scenario';
+    } finally {
+      input.value = '';
+    }
+  }
+
+  async function handleDeleteScenario(id: string) {
+    await scenarioVault.delete(id);
+  }
+
+  async function handleToggleFavoriteScenario(id: string) {
+    await scenarioVault.toggleFavorite(id);
+  }
+
+  function openEditScenario(scenario: VaultScenario) {
+    editingScenario = scenario;
+  }
+
+  function openBrowseOnline(mode: 'character' | 'lorebook' | 'scenario') {
+    discoveryMode = mode;
+    showDiscoveryModal = true;
+  }
 </script>
 
 <div class="flex h-full flex-col bg-surface-900">
@@ -265,19 +263,22 @@
       <!-- Right Side Actions (Context Sensitive) -->
       <div class="flex items-center gap-2">
         {#if activeTab === 'characters'}
+          <button
+            class="flex items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 hover:bg-surface-600"
+            onclick={() => openBrowseOnline('character')}
+            title="Browse characters online"
+          >
+            <Globe class="h-4 w-4" />
+            <span class="hidden sm:inline">Browse Online</span>
+          </button>
           <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500">
-            {#if importingChar}
-              <Loader2 class="h-4 w-4 animate-spin" />
-            {:else}
-              <Upload class="h-4 w-4" />
-            {/if}
+            <Upload class="h-4 w-4" />
             <span class="hidden sm:inline">Import Card</span>
             <input
               type="file"
               accept=".json,.png"
               class="hidden"
               onchange={handleImportCard}
-              disabled={importingChar}
             />
           </label>
           <button
@@ -287,21 +288,44 @@
             <Plus class="h-4 w-4" />
             <span class="hidden sm:inline">New Character</span>
           </button>
-        {:else}
+        {:else if activeTab === 'lorebooks'}
           <!-- Lorebook Actions -->
-          <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 {importingLorebook ? 'opacity-50 cursor-not-allowed' : ''}">
-            {#if importingLorebook}
-              <Loader2 class="h-4 w-4 animate-spin" />
-            {:else}
-              <Upload class="h-4 w-4" />
-            {/if}
+          <button
+            class="flex items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 hover:bg-surface-600"
+            onclick={() => openBrowseOnline('lorebook')}
+            title="Browse lorebooks online"
+          >
+            <Globe class="h-4 w-4" />
+            <span class="hidden sm:inline">Browse Online</span>
+          </button>
+          <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500">
+            <Upload class="h-4 w-4" />
             <span class="hidden sm:inline">Import Lorebook</span>
             <input
               type="file"
               accept=".json,application/json"
               class="hidden"
               onchange={handleImportLorebook}
-              disabled={importingLorebook}
+            />
+          </label>
+        {:else if activeTab === 'scenarios'}
+          <!-- Scenario Actions -->
+          <button
+            class="flex items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500 hover:bg-surface-600"
+            onclick={() => openBrowseOnline('scenario')}
+            title="Browse scenarios online"
+          >
+            <Globe class="h-4 w-4" />
+            <span class="hidden sm:inline">Browse Online</span>
+          </button>
+          <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-surface-600 bg-surface-700 px-3 py-1.5 text-sm text-surface-300 hover:border-surface-500">
+            <Upload class="h-4 w-4" />
+            <span class="hidden sm:inline">Import Card</span>
+            <input
+              type="file"
+              accept=".json,.png"
+              class="hidden"
+              onchange={handleImportScenario}
             />
           </label>
           <button
@@ -337,6 +361,16 @@
           {lorebookVault.lorebooks.length}
         </span>
       </button>
+      <button
+        class="flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors {activeTab === 'scenarios' ? 'border-accent-500 text-accent-400' : 'border-transparent text-surface-400 hover:text-surface-200'}"
+        onclick={() => activeTab = 'scenarios'}
+      >
+        <MapPin class="h-4 w-4" />
+        Scenarios
+        <span class="ml-1 rounded-full bg-surface-700 px-2 py-0.5 text-xs text-surface-400">
+          {scenarioVault.scenarios.length}
+        </span>
+      </button>
     </div>
   </div>
 
@@ -352,32 +386,29 @@
       </div>
     {/if}
 
-    {#if activeTab === 'lorebooks'}
-      {#if importLorebookError}
-        <div class="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-sm text-red-400 flex items-center justify-between">
-          <span>{importLorebookError}</span>
-          <button onclick={() => importLorebookError = null} class="text-red-400 hover:text-red-300">
-            <span class="sr-only">Dismiss</span>
-            &times;
-          </button>
-        </div>
+      {#if activeTab === 'lorebooks'}
+        {#if importLorebookError}
+          <div class="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-sm text-red-400 flex items-center justify-between">
+            <span>{importLorebookError}</span>
+            <button onclick={() => importLorebookError = null} class="text-red-400 hover:text-red-300">
+              <span class="sr-only">Dismiss</span>
+              &times;
+            </button>
+          </div>
+        {/if}
       {/if}
 
-      {#if importingLorebook && importProgress.total > 0}
-        <div class="rounded-lg bg-surface-800 p-3 border border-surface-700">
-          <div class="flex justify-between text-xs text-surface-400 mb-1">
-            <span>Classifying entries...</span>
-            <span>{importProgress.current} / {importProgress.total}</span>
+      {#if activeTab === 'scenarios'}
+        {#if importScenarioError}
+          <div class="rounded-lg bg-red-500/10 border border-red-500/30 p-2 text-sm text-red-400 flex items-center justify-between">
+            <span>{importScenarioError}</span>
+            <button onclick={() => importScenarioError = null} class="text-red-400 hover:text-red-300">
+              <span class="sr-only">Dismiss</span>
+              &times;
+            </button>
           </div>
-          <div class="w-full bg-surface-700 rounded-full h-1.5">
-            <div
-              class="bg-accent-500 h-1.5 rounded-full transition-all duration-300"
-              style="width: {(importProgress.current / importProgress.total) * 100}%"
-            ></div>
-          </div>
-        </div>
+        {/if}
       {/if}
-    {/if}
 
     <div class="flex flex-col sm:flex-row gap-3">
       <div class="relative flex-1">
@@ -385,7 +416,7 @@
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder={activeTab === 'characters' ? "Search characters..." : "Search lorebooks..."}
+          placeholder={activeTab === 'characters' ? "Search characters..." : activeTab === 'lorebooks' ? "Search lorebooks..." : "Search scenarios..."}
           class="w-full rounded-lg border border-surface-600 bg-surface-700 pl-10 pr-3 py-2 text-surface-100 placeholder-surface-500 focus:border-accent-500 focus:outline-none"
         />
       </div>
@@ -479,7 +510,7 @@
         </div>
       {/if}
     
-    {:else}
+    {:else if activeTab === 'lorebooks'}
       <!-- Lorebook Grid -->
       {#if !lorebookVault.isLoaded}
         <div class="flex h-full items-center justify-center">
@@ -524,6 +555,41 @@
           {/each}
         </div>
       {/if}
+
+    {:else if activeTab === 'scenarios'}
+      <!-- Scenario Grid -->
+      {#if !scenarioVault.isLoaded}
+        <div class="flex h-full items-center justify-center">
+          <Loader2 class="h-8 w-8 animate-spin text-surface-500" />
+        </div>
+      {:else if filteredScenarios.length === 0}
+        <div class="flex h-full items-center justify-center" in:fade>
+          <div class="text-center">
+            <MapPin class="mx-auto h-12 w-12 text-surface-600" />
+            <p class="mt-3 text-surface-400">
+              {#if searchQuery || showFavoritesOnly}
+                No scenarios match your filters
+              {:else}
+                No scenarios in vault yet
+              {/if}
+            </p>
+            <p class="mt-1 text-sm text-surface-500">
+              Import character cards to extract scenario settings
+            </p>
+          </div>
+        </div>
+      {:else}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" in:fade>
+          {#each filteredScenarios as scenario (scenario.id)}
+            <VaultScenarioCard
+              {scenario}
+              onDelete={() => handleDeleteScenario(scenario.id)}
+              onToggleFavorite={() => handleToggleFavoriteScenario(scenario.id)}
+              onEdit={() => openEditScenario(scenario)}
+            />
+          {/each}
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
@@ -544,3 +610,18 @@
     onClose={() => editingLorebook = null}
   />
 {/if}
+
+<!-- Scenario Editor Modal -->
+{#if editingScenario}
+  <VaultScenarioEditor
+    scenario={editingScenario}
+    onClose={() => editingScenario = null}
+  />
+{/if}
+
+<!-- Discovery Modal -->
+<DiscoveryModal
+  isOpen={showDiscoveryModal}
+  mode={discoveryMode}
+  onClose={() => showDiscoveryModal = false}
+/>

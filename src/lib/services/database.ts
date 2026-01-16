@@ -23,6 +23,7 @@ import type {
   VaultCharacter,
   VaultCharacterType,
   VaultLorebook,
+  VaultScenario,
 } from '$lib/types';
 
 class DatabaseService {
@@ -1849,6 +1850,110 @@ private mapEmbeddedImage(row: any): EmbeddedImage {
       source: row.source || 'import',
       originalFilename: row.original_filename,
       originalStoryId: row.original_story_id,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  // ===== Scenario Vault Operations =====
+
+  async getVaultScenarios(): Promise<VaultScenario[]> {
+    const db = await this.getDb();
+    const results = await db.select<any[]>(
+      'SELECT * FROM scenario_vault ORDER BY favorite DESC, updated_at DESC'
+    );
+    return results.map(this.mapVaultScenario);
+  }
+
+  async getVaultScenario(id: string): Promise<VaultScenario | null> {
+    const db = await this.getDb();
+    const results = await db.select<any[]>(
+      'SELECT * FROM scenario_vault WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? this.mapVaultScenario(results[0]) : null;
+  }
+
+  async addVaultScenario(scenario: VaultScenario): Promise<void> {
+    const db = await this.getDb();
+    await db.execute(
+      `INSERT INTO scenario_vault (
+        id, name, description, setting_seed, npcs, primary_character_name,
+        first_message, alternate_greetings, tags, favorite, source,
+        original_filename, metadata, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        scenario.id,
+        scenario.name,
+        scenario.description,
+        scenario.settingSeed,
+        JSON.stringify(scenario.npcs),
+        scenario.primaryCharacterName,
+        scenario.firstMessage,
+        JSON.stringify(scenario.alternateGreetings),
+        JSON.stringify(scenario.tags),
+        scenario.favorite ? 1 : 0,
+        scenario.source,
+        scenario.originalFilename,
+        scenario.metadata ? JSON.stringify(scenario.metadata) : null,
+        scenario.createdAt,
+        scenario.updatedAt,
+      ]
+    );
+  }
+
+  async updateVaultScenario(id: string, updates: Partial<VaultScenario>): Promise<void> {
+    const db = await this.getDb();
+    const setClauses: string[] = ['updated_at = ?'];
+    const values: any[] = [Date.now()];
+
+    if (updates.name !== undefined) { setClauses.push('name = ?'); values.push(updates.name); }
+    if (updates.description !== undefined) { setClauses.push('description = ?'); values.push(updates.description); }
+    if (updates.settingSeed !== undefined) { setClauses.push('setting_seed = ?'); values.push(updates.settingSeed); }
+    if (updates.npcs !== undefined) { setClauses.push('npcs = ?'); values.push(JSON.stringify(updates.npcs)); }
+    if (updates.primaryCharacterName !== undefined) { setClauses.push('primary_character_name = ?'); values.push(updates.primaryCharacterName); }
+    if (updates.firstMessage !== undefined) { setClauses.push('first_message = ?'); values.push(updates.firstMessage); }
+    if (updates.alternateGreetings !== undefined) { setClauses.push('alternate_greetings = ?'); values.push(JSON.stringify(updates.alternateGreetings)); }
+    if (updates.tags !== undefined) { setClauses.push('tags = ?'); values.push(JSON.stringify(updates.tags)); }
+    if (updates.favorite !== undefined) { setClauses.push('favorite = ?'); values.push(updates.favorite ? 1 : 0); }
+    if (updates.metadata !== undefined) { setClauses.push('metadata = ?'); values.push(updates.metadata ? JSON.stringify(updates.metadata) : null); }
+
+    values.push(id);
+    await db.execute(`UPDATE scenario_vault SET ${setClauses.join(', ')} WHERE id = ?`, values);
+  }
+
+  async deleteVaultScenario(id: string): Promise<void> {
+    const db = await this.getDb();
+    await db.execute('DELETE FROM scenario_vault WHERE id = ?', [id]);
+  }
+
+  async searchVaultScenarios(query: string): Promise<VaultScenario[]> {
+    const db = await this.getDb();
+    const searchPattern = `%${query}%`;
+    const results = await db.select<any[]>(
+      `SELECT * FROM scenario_vault WHERE 
+        name LIKE ? OR description LIKE ? OR tags LIKE ? OR setting_seed LIKE ?
+      ORDER BY favorite DESC, updated_at DESC`,
+      [searchPattern, searchPattern, searchPattern, searchPattern]
+    );
+    return results.map(this.mapVaultScenario);
+  }
+
+  private mapVaultScenario(row: any): VaultScenario {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      settingSeed: row.setting_seed,
+      npcs: row.npcs ? JSON.parse(row.npcs) : [],
+      primaryCharacterName: row.primary_character_name || '',
+      firstMessage: row.first_message,
+      alternateGreetings: row.alternate_greetings ? JSON.parse(row.alternate_greetings) : [],
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      favorite: row.favorite === 1,
+      source: row.source || 'import',
+      originalFilename: row.original_filename,
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
