@@ -308,6 +308,13 @@
               onchange={handleImportLorebook}
             />
           </label>
+          <button
+            class="flex items-center gap-2 rounded-lg bg-accent-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-600"
+            onclick={handleCreateLorebook}
+          >
+            <Plus class="h-4 w-4" />
+            <span class="hidden sm:inline">New Lorebook</span>
+          </button>
         {:else if activeTab === 'scenarios'}
           <!-- Scenario Actions -->
           <button
@@ -328,13 +335,6 @@
               onchange={handleImportScenario}
             />
           </label>
-          <button
-            class="flex items-center gap-2 rounded-lg bg-accent-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-600"
-            onclick={handleCreateLorebook}
-          >
-            <Plus class="h-4 w-4" />
-            <span class="hidden sm:inline">New Lorebook</span>
-          </button>
         {/if}
       </div>
     </div>
