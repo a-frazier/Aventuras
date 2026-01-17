@@ -25,8 +25,10 @@
     return entryId ? ui.isReasoningExpanded(entryId) : false;
   });
 
-  // Toggle function that updates the appropriate store
+  // Toggle function that updates the appropriate store (only when enabled)
   function toggleOpen() {
+    if (!isToggleEnabled) return;
+    
     if (isStreaming) {
       ui.setStreamingReasoningExpanded(!isOpen);
     } else if (entryId) {
@@ -34,35 +36,38 @@
     }
   }
 
-  let isVisible = $derived(settings.uiSettings.showReasoning || isStreaming);
+  // Toggle button is always visible when there's content
+  let isToggleEnabled = $derived(settings.uiSettings.showReasoning || isStreaming);
+  
+  // Content panel visibility respects the setting
+  let isContentVisible = $derived(settings.uiSettings.showReasoning);
   
   let renderedContent = $derived(parseMarkdown(content));
 </script>
 
-{#if isVisible}
-  {#if showToggleOnly}
-    <!-- Toggle-only mode: just the icon button for header row -->
-    <button 
-      class="reasoning-toggle"
-      class:is-open={isOpen}
-      class:is-streaming={isStreaming}
-      onclick={toggleOpen}
-      title={isOpen ? "Hide thinking" : "Show thinking"}
-    >
-      <Brain class="h-3.5 w-3.5" />
-      {#if isStreaming}
-        <span class="streaming-indicator"></span>
-      {/if}
-    </button>
-  {:else}
-    <!-- Content panel mode: the expanded reasoning content -->
-    {#if isOpen}
-      <div class="reasoning-panel" transition:slide={{ duration: 150 }}>
-        <div class="reasoning-text prose-content">
-          {@html renderedContent}
-        </div>
-      </div>
+{#if showToggleOnly}
+  <!-- Toggle-only mode: just the icon button for header row -->
+  <button 
+    class="reasoning-toggle"
+    class:is-open={isOpen}
+    class:is-streaming={isStreaming}
+    class:is-disabled={!isToggleEnabled}
+    onclick={toggleOpen}
+    title={isToggleEnabled ? (isOpen ? "Hide thinking" : "Show thinking") : "Reasoning display is disabled in settings"}
+  >
+    <Brain class="h-3.5 w-3.5" />
+    {#if isStreaming}
+      <span class="streaming-indicator"></span>
     {/if}
+  </button>
+{:else}
+  <!-- Content panel mode: the expanded reasoning content -->
+  {#if isContentVisible && isOpen}
+    <div class="reasoning-panel" transition:slide={{ duration: 150 }}>
+      <div class="reasoning-text prose-content">
+        {@html renderedContent}
+      </div>
+    </div>
   {/if}
 {/if}
 
@@ -81,9 +86,11 @@
     transition: all 0.15s ease;
   }
 
-  .reasoning-toggle:hover {
-    color: var(--color-surface-300, #cbd5e1);
-    background: var(--color-surface-700, #334155);
+  @media (hover: hover) {
+    .reasoning-toggle:not(.is-disabled):hover {
+      color: var(--color-surface-300, #cbd5e1);
+      background: var(--color-surface-700, #334155);
+    }
   }
 
   .reasoning-toggle.is-open {
@@ -92,6 +99,11 @@
 
   .reasoning-toggle.is-streaming {
     color: var(--color-accent-400, #60a5fa);
+  }
+
+  .reasoning-toggle.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .streaming-indicator {

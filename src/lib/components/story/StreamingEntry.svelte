@@ -3,6 +3,7 @@
   import { BookOpen, Volume2, Pencil, Trash2 } from 'lucide-svelte';
   import { parseMarkdown } from '$lib/utils/markdown';
   import ReasoningBlock from './ReasoningBlock.svelte';
+  import { settings } from '$lib/stores/settings.svelte';
 
   // Reactive binding to streaming content
   let content = $derived(ui.streamingContent);
@@ -18,6 +19,11 @@
   // Show thinking state when streaming but no content yet (and no reasoning)
   let reasoning = $derived(ui.streamingReasoning);
   let isThinking = $derived(ui.isStreaming && content.length === 0 && reasoning.length === 0);
+  
+  // Check if reasoning is enabled in API settings
+  let isReasoningEnabled = $derived(
+    settings.apiSettings.reasoningEffort !== 'off' && settings.apiSettings.enableThinking
+  );
   
   // Live token counts (separate)
   let reasoningTokens = $derived(ui.streamingReasoningTokens);
@@ -36,14 +42,14 @@
     <div class="flex items-center gap-2 mb-2">
       <BookOpen class="h-4 w-4 shrink-0 translate-y-px animate-pulse text-accent-400" />
       
-      <!-- Reasoning toggle (inline icon) -->
-      {#if reasoning || isThinking}
+      <!-- Reasoning toggle (inline icon) - only show if reasoning is enabled -->
+      {#if isReasoningEnabled && (reasoning || isThinking)}
         <ReasoningBlock content={reasoning} isStreaming={true} showToggleOnly={true} />
       {/if}
       
       <!-- Live token counts with phase-based highlighting -->
       <span class="text-[11px] bg-surface-700/50 px-1.5 py-0.5 rounded tabular-nums">
-        {#if reasoningTokens > 0}
+        {#if isReasoningEnabled && reasoningTokens > 0}
           <span 
             class="transition-colors duration-200"
             class:text-surface-400={isReasoningPhase}

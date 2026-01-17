@@ -47,6 +47,11 @@
   const contentTokens = $derived(entry.metadata?.tokenCount ?? 0);
   const reasoningTokens = $derived(entry.reasoning ? countTokens(entry.reasoning) : 0);
 
+  // Check if reasoning is enabled in API settings
+  const isReasoningEnabled = $derived(
+    settings.apiSettings.reasoningEffort !== 'off' && settings.apiSettings.enableThinking
+  );
+
   // TTS generation state
   let isGeneratingTTS = $state(false);
   let isPlayingTTS = $state(false);
@@ -958,14 +963,14 @@
       <Icon class="h-4 w-4 shrink-0 translate-y-px text-surface-500" />
     {/if}
     
-    <!-- Reasoning toggle (inline icon in header) -->
-    {#if entry.reasoning}
+    <!-- Reasoning toggle (inline icon in header) - only show if reasoning is enabled -->
+    {#if isReasoningEnabled && entry.reasoning}
       <ReasoningBlock content={entry.reasoning} isStreaming={false} entryId={entry.id} showToggleOnly={true} />
     {/if}
     
     <!-- Token count badge (shows 0 if no tokens) -->
     <span class="text-[11px] bg-surface-700/50 px-1.5 py-0.5 rounded tabular-nums">
-      {#if reasoningTokens > 0}
+      {#if isReasoningEnabled && reasoningTokens > 0}
         <span class="text-surface-500">{reasoningTokens}r</span>
         <span class="text-surface-600 mx-0.5">+</span>
       {/if}
