@@ -1633,8 +1633,19 @@
     <div
       class="rounded-lg border-l-0 sm:border-l-4 {ui.isGenerating
         ? 'sm:border-l-surface-600 bg-surface-400/5'
-        : 'border-l-accent-500 sm:bg-surface-400/5'} transition-colors duration-200"
+        : 'border-l-accent-500 sm:bg-surface-400/5'} transition-colors duration-200 relative"
     >
+      <!-- Mobile Word Count Pill -->
+      {#if settings.uiSettings.showWordCount}
+        <div class="absolute top-2 right-0 sm:hidden">
+          <div
+            class="bg-surface-700 px-2 py-0.5 rounded-b-lg rounded-t-md text-[10px] text-surface-400"
+          >
+            {story.wordCount} wc
+          </div>
+        </div>
+      {/if}
+
       <!-- Creative Writing Mode: Suggestions (Header) -->
       {#if !settings.uiSettings.disableSuggestions}
         <div class="border-b border-surface-700/30">
@@ -1707,8 +1718,19 @@
     <div
       class="rounded-lg border-l-0 sm:border-l-4 sm:bg-surface-400/5 {ui.isGenerating
         ? 'sm:border-l-surface-60'
-        : `${actionBorderColors[actionType]}`} transition-colors duration-200"
+        : `${actionBorderColors[actionType]}`} transition-colors duration-200 relative"
     >
+      <!-- Mobile Word Count Pill -->
+      {#if settings.uiSettings.showWordCount}
+        <div class="absolute -top-[2.05rem] -right-3 sm:hidden">
+          <div
+            class="bg-surface-800 px-2 py-0.5 border border-surface-500/30 border-b-0 rounded-tl-md text-sm text-surface-400"
+          >
+            {story.wordCount} words
+          </div>
+        </div>
+      {/if}
+
       <!-- Action type selector row (Top - both mobile and desktop) -->
       {#if !settings.uiSettings.disableActionPrefixes}
         <div
