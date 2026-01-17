@@ -31,6 +31,7 @@
     ChevronDown,
     ChevronUp,
     Download,
+    Upload,
     Loader2,
     Scroll,
     Image,
@@ -44,12 +45,14 @@
     type SimpleMacro,
     type ComplexMacro,
   } from "$lib/services/prompts";
+  import { promptExportService } from "$lib/services/promptExport";
   import PromptEditor from "../prompts/PromptEditor.svelte";
   import MacroChip from "../prompts/MacroChip.svelte";
   import MacroEditor from "../prompts/MacroEditor.svelte";
   import ComplexMacroEditor from "../prompts/ComplexMacroEditor.svelte";
   import { ask } from "@tauri-apps/plugin-dialog";
   import ProfileModal from "./ProfileModal.svelte";
+  import PromptImportModal from "./PromptImportModal.svelte";
   import FontSelector from "./FontSelector.svelte";
   import TTSSettings from "./TTSSettings.svelte";
   import MainNarrative from "./MainNarrative.svelte";
@@ -115,6 +118,9 @@
   let showMacroEditor = $state(false);
   let showComplexMacroEditor = $state(false);
   let promptsCategory = $state<"story" | "service" | "wizard">("story");
+
+  let isExporting = $state(false);
+  let promptImportModalOpen = $state(false);
 
   // Get all templates grouped by category
   const allTemplates = $derived(promptService.getAllTemplates());
@@ -1408,23 +1414,53 @@
                   </div>
 
                   <!-- Templates List -->
-                  <div class="space-y-4">
-                    <div class="flex items-center justify-between">
+                  <div class="space-y-4 !mt-0 sm:!mt-3">
+                    <div
+                      class="flex items-center justify-between -mb-3 sm:-mb-1"
+                    >
                       <h3 class="text-sm font-medium text-surface-200">
                         {getCategoryLabel()}
                       </h3>
-                      <button
-                        class="text-xs text-accent-400 hover:text-accent-300 flex items-center gap-1"
-                        onclick={() => {
-                          getTemplatesForCategory().forEach((t) => {
-                            handleTemplateReset(t.id);
-                            handleUserContentReset(t.id);
-                          });
-                        }}
-                      >
-                        <RotateCcw class="h-3 w-3" />
-                        Reset All
-                      </button>
+                      <div class="flex items-center">
+                        <button
+                          class="text-xs text-accent-400 hover:text-accent-300 flex items-center gap-1 px-2 py-1"
+                          onclick={() => {
+                            getTemplatesForCategory().forEach((t) => {
+                              handleTemplateReset(t.id);
+                              handleUserContentReset(t.id);
+                            });
+                          }}
+                        >
+                          <RotateCcw class="h-3 w-3" />
+                          Reset All
+                        </button>
+                        <button
+                          class="btn-ghost text-xs px-2 py-1 flex items-center gap-1"
+                          onclick={async () => {
+                            isExporting = true;
+                            try {
+                              await promptExportService.exportPrompts();
+                            } finally {
+                              isExporting = false;
+                            }
+                          }}
+                          disabled={isExporting}
+                        >
+                          {#if isExporting}
+                            <Loader2 class="h-3.5 w-3.5 animate-spin" />
+                          {:else}
+                            <Download class="h-3.5 w-3.5" />
+                          {/if}
+                          Export
+                        </button>
+                        <button
+                          class="btn-ghost text-xs px-2 py-1 flex items-center gap-1"
+                          onclick={() => (promptImportModalOpen = true)}
+                        >
+                          <Upload class="h-3.5 w-3.5" />
+                          Import
+                        </button>
+                      </div>
                     </div>
 
                     {#each getTemplatesForCategory() as template}
@@ -1487,7 +1523,7 @@
                   </div>
 
                   <!-- Macros Section -->
-                  <div class="border-t border-surface-700 pt-6 space-y-4">
+                  <div class="border-t border-surface-700 pt-4 space-y-4">
                     <div class="flex items-center justify-between">
                       <div>
                         <h3 class="text-sm font-medium text-surface-200">
@@ -2036,6 +2072,12 @@
     editingProfile = null;
   }}
   onSave={handleProfileSave}
+/>
+
+<!-- Prompt Import Modal -->
+<PromptImportModal
+  open={promptImportModalOpen}
+  onClose={() => (promptImportModalOpen = false)}
 />
 
 <!-- Macro Editor Modals -->

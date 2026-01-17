@@ -2845,6 +2845,10 @@ class SettingsStore {
     await database.setSetting('generation_presets', JSON.stringify(this.generationPresets));
   }
 
+  async saveServicePresetAssignments() {
+    await database.setSetting('service_preset_assignments', JSON.stringify(this.servicePresetAssignments));
+  }
+
   async resetGenerationPresets() {
     const effectiveProvider = this.getEffectiveProviderPreset();
     const customModel = effectiveProvider === 'custom' ? this.getFirstModelFromDefaultProfile() : null;
