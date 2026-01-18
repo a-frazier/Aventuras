@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { slide } from 'svelte/transition';
+  import { slide } from "svelte/transition";
   import { story } from "$lib/stores/story.svelte";
   import { ui } from "$lib/stores/ui.svelte";
   import { settings } from "$lib/stores/settings.svelte";
@@ -29,12 +29,20 @@
   import { NanoGPTImageProvider } from "$lib/services/ai/nanoGPTImageProvider";
   import { promptService } from "$lib/services/prompts";
   import { normalizeImageDataUrl } from "$lib/utils/image";
-  import type { StoryMode, POV, EntryType, VaultCharacter, VaultLorebook, VaultLorebookEntry, VaultScenario } from "$lib/types";
+  import type {
+    StoryMode,
+    POV,
+    EntryType,
+    VaultCharacter,
+    VaultLorebook,
+    VaultLorebookEntry,
+    VaultScenario,
+  } from "$lib/types";
   import VaultCharacterPicker from "$lib/components/vault/VaultCharacterPicker.svelte";
   import VaultLorebookPicker from "$lib/components/vault/VaultLorebookPicker.svelte";
   import VaultScenarioPicker from "$lib/components/vault/VaultScenarioPicker.svelte";
-  import { lorebookVault } from '$lib/stores/lorebookVault.svelte';
-  import { scenarioVault } from '$lib/stores/scenarioVault.svelte';
+  import { lorebookVault } from "$lib/stores/lorebookVault.svelte";
+  import { scenarioVault } from "$lib/stores/scenarioVault.svelte";
   import {
     X,
     ChevronLeft,
@@ -67,7 +75,7 @@
     ImageUp,
   } from "lucide-svelte";
 
-import { QUICK_START_SEEDS } from "$lib/services/templates";
+  import { QUICK_START_SEEDS } from "$lib/services/templates";
 
   interface Props {
     onClose: () => void;
@@ -84,12 +92,12 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   let scenarioCarouselRef = $state<HTMLDivElement | null>(null);
 
   const templateIcons: Record<string, typeof Wand2> = {
-    'fantasy-adventure': Wand2,
-    'scifi-exploration': Rocket,
-    'mystery-investigation': Search,
-    'horror-survival': Skull,
-    'slice-of-life': Heart,
-    'historical-drama': Building,
+    "fantasy-adventure": Wand2,
+    "scifi-exploration": Rocket,
+    "mystery-investigation": Search,
+    "horror-survival": Skull,
+    "slice-of-life": Heart,
+    "historical-drama": Building,
   };
 
   // Step 1: Mode
@@ -171,7 +179,9 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   let importFileInput: HTMLInputElement | null = null;
 
   // Combine all entries from all lorebooks for use in later steps
-  const importedEntries = $derived(importedLorebooks.flatMap((lb) => lb.entries));
+  const importedEntries = $derived(
+    importedLorebooks.flatMap((lb) => lb.entries),
+  );
 
   // Combined summary for display
   const importSummary = $derived.by(() => {
@@ -223,7 +233,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   let isEditingOpening = $state(false);
   let openingDraft = $state("");
 
-// Check if API key is configured
+  // Check if API key is configured
   const needsApiKey = $derived(settings.needsApiKey);
 
   // Genre options with icons
@@ -440,7 +450,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         seed,
         selectedGenre,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:settingExpansion'],
+        settings.servicePresetAssignments["wizard:settingExpansion"],
         lorebookContext,
         settingElaborationGuidance.trim() || undefined,
       );
@@ -478,7 +488,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         expandedSetting,
         selectedGenre,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:settingRefinement'],
+        settings.servicePresetAssignments["wizard:settingRefinement"],
         lorebookContext,
         settingElaborationGuidance.trim() || undefined,
       );
@@ -491,7 +501,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     } finally {
       isExpandingSetting = false;
     }
-}
+  }
 
   // Step 3: Edit setting (populate seed with expanded description)
   function editSetting() {
@@ -505,28 +515,28 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
 
   // Step 4: Select a pre-defined scenario
   function selectScenario(scenarioId: string) {
-    const scenario = QUICK_START_SEEDS.find(s => s.id === scenarioId);
+    const scenario = QUICK_START_SEEDS.find((s) => s.id === scenarioId);
     if (!scenario) return;
 
     selectedScenarioId = scenarioId;
 
     // Map seed genre to wizard genre
     const genreMap: Record<string, Genre> = {
-      'Fantasy': 'fantasy',
-      'Sci-Fi': 'scifi',
-      'Mystery': 'mystery',
-      'Horror': 'horror',
-      'Slice of Life': 'romance',
-      'Historical': 'custom',
+      Fantasy: "fantasy",
+      "Sci-Fi": "scifi",
+      Mystery: "mystery",
+      Horror: "horror",
+      "Slice of Life": "romance",
+      Historical: "custom",
     };
     const mappedGenre = genreMap[scenario.genre];
     if (mappedGenre) {
       selectedGenre = mappedGenre;
-      if (mappedGenre === 'custom') {
+      if (mappedGenre === "custom") {
         customGenre = scenario.genre;
       }
     } else {
-      selectedGenre = 'custom';
+      selectedGenre = "custom";
       customGenre = scenario.genre;
     }
 
@@ -540,11 +550,11 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     // Pre-fill protagonist data
     const proto = scenario.initialState.protagonist;
     if (proto) {
-      manualCharacterName = proto.name ?? '';
-      manualCharacterDescription = proto.description ?? '';
-      manualCharacterBackground = proto.background ?? '';
-      manualCharacterMotivation = proto.motivation ?? '';
-      manualCharacterTraits = proto.traits?.join(', ') ?? '';
+      manualCharacterName = proto.name ?? "";
+      manualCharacterDescription = proto.description ?? "";
+      manualCharacterBackground = proto.background ?? "";
+      manualCharacterMotivation = proto.motivation ?? "";
+      manualCharacterTraits = proto.traits?.join(", ") ?? "";
       showManualInput = true;
       useManualCharacter();
     }
@@ -553,10 +563,10 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   // Handle infinite carousel scroll - jump to middle when reaching edges
   function handleCarouselScroll() {
     if (!scenarioCarouselRef) return;
-    
+
     const { scrollLeft, scrollWidth, clientWidth } = scenarioCarouselRef;
     const singleSetWidth = scrollWidth / 3;
-    
+
     // If scrolled near the start (first clone set), jump to middle set
     if (scrollLeft < 20) {
       scenarioCarouselRef.scrollLeft = singleSetWidth + scrollLeft;
@@ -598,7 +608,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         selectedMode,
         selectedPOV,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:protagonistGeneration'],
+        settings.servicePresetAssignments["wizard:protagonistGeneration"],
       );
     } catch (error) {
       console.error("Failed to generate protagonist:", error);
@@ -710,18 +720,35 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     if (isElaboratingCharacter) return;
 
     // Determine source of character data
-    const sourceName = useCurrentProtagonist && protagonist ? protagonist.name : manualCharacterName.trim();
-    const sourceDescription = useCurrentProtagonist && protagonist ? protagonist.description : manualCharacterDescription.trim();
-    const sourceBackground = useCurrentProtagonist && protagonist ? protagonist.background : manualCharacterBackground.trim();
-    const sourceMotivation = useCurrentProtagonist && protagonist ? protagonist.motivation : manualCharacterMotivation.trim();
-    const sourceTraits = useCurrentProtagonist && protagonist
-      ? protagonist.traits
-      : (manualCharacterTraits.trim()
-          ? manualCharacterTraits.split(",").map((t) => t.trim()).filter(Boolean)
-          : undefined);
+    const sourceName =
+      useCurrentProtagonist && protagonist
+        ? protagonist.name
+        : manualCharacterName.trim();
+    const sourceDescription =
+      useCurrentProtagonist && protagonist
+        ? protagonist.description
+        : manualCharacterDescription.trim();
+    const sourceBackground =
+      useCurrentProtagonist && protagonist
+        ? protagonist.background
+        : manualCharacterBackground.trim();
+    const sourceMotivation =
+      useCurrentProtagonist && protagonist
+        ? protagonist.motivation
+        : manualCharacterMotivation.trim();
+    const sourceTraits =
+      useCurrentProtagonist && protagonist
+        ? protagonist.traits
+        : manualCharacterTraits.trim()
+          ? manualCharacterTraits
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : undefined;
 
     // Need at least a name or some input
-    const hasInput = sourceName || sourceDescription || sourceBackground || sourceMotivation;
+    const hasInput =
+      sourceName || sourceDescription || sourceBackground || sourceMotivation;
 
     if (!hasInput) {
       protagonistError =
@@ -744,7 +771,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         expandedSetting,
         selectedGenre,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:characterElaboration'],
+        settings.servicePresetAssignments["wizard:characterElaboration"],
         characterElaborationGuidance.trim() || undefined,
       );
       showManualInput = false;
@@ -774,7 +801,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         expandedSetting,
         selectedGenre,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:characterRefinement'],
+        settings.servicePresetAssignments["wizard:characterRefinement"],
         characterElaborationGuidance.trim() || undefined,
       );
       characterElaborationGuidance = "";
@@ -813,7 +840,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         selectedGenre,
         3,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:supportingCharacters'],
+        settings.servicePresetAssignments["wizard:supportingCharacters"],
       );
     } catch (error) {
       console.error("Failed to generate characters:", error);
@@ -911,7 +938,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         expandedSetting,
         selectedGenre,
         customGenre || undefined,
-        settings.servicePresetAssignments['wizard:characterElaboration'],
+        settings.servicePresetAssignments["wizard:characterElaboration"],
         supportingCharacterGuidance.trim() || undefined,
       );
 
@@ -990,7 +1017,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     try {
       generatedOpening = await scenarioService.generateOpening(
         wizardData,
-        settings.servicePresetAssignments['wizard:openingGeneration'],
+        settings.servicePresetAssignments["wizard:openingGeneration"],
         lorebookContext,
       );
     } catch (error) {
@@ -1077,7 +1104,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
       generatedOpening = await scenarioService.refineOpening(
         wizardData,
         currentOpening,
-        settings.servicePresetAssignments['wizard:openingRefinement'],
+        settings.servicePresetAssignments["wizard:openingRefinement"],
         lorebookContext,
       );
       clearOpeningEditState();
@@ -1094,7 +1121,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   async function createStory() {
     // Sanity checks
     if (!storyTitle.trim()) return;
-    
+
     // Allow proceeding if we have a card-imported opening, even if not generated
     // Construct a generatedOpening object from the card data if needed
     if (!generatedOpening && cardImportedFirstMessage) {
@@ -1103,8 +1130,8 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
         title: cardImportedTitle || storyTitle || "Untitled Story",
         initialLocation: {
           name: "Starting Location",
-          description: "The place where your journey begins."
-        }
+          description: "The place where your journey begins.",
+        },
       };
     }
 
@@ -1119,21 +1146,34 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     // --- Data Pre-processing: Replace {{user}} placeholders ---
 
     // 1. Setting Seed
-    const processedSettingSeed = replaceUserPlaceholders(settingSeed, protagonistName);
+    const processedSettingSeed = replaceUserPlaceholders(
+      settingSeed,
+      protagonistName,
+    );
 
     // 2. Expanded Setting
     let processedExpandedSetting: ExpandedSetting | null = null;
     if (expandedSetting) {
       processedExpandedSetting = {
         ...expandedSetting,
-        description: replaceUserPlaceholders(expandedSetting.description, protagonistName),
-        keyLocations: expandedSetting.keyLocations.map(l => ({
+        description: replaceUserPlaceholders(
+          expandedSetting.description,
+          protagonistName,
+        ),
+        keyLocations: expandedSetting.keyLocations.map((l) => ({
           ...l,
-          description: replaceUserPlaceholders(l.description, protagonistName)
+          description: replaceUserPlaceholders(l.description, protagonistName),
         })),
-        atmosphere: replaceUserPlaceholders(expandedSetting.atmosphere, protagonistName),
-        themes: expandedSetting.themes.map(t => replaceUserPlaceholders(t, protagonistName)),
-        potentialConflicts: expandedSetting.potentialConflicts.map(c => replaceUserPlaceholders(c, protagonistName))
+        atmosphere: replaceUserPlaceholders(
+          expandedSetting.atmosphere,
+          protagonistName,
+        ),
+        themes: expandedSetting.themes.map((t) =>
+          replaceUserPlaceholders(t, protagonistName),
+        ),
+        potentialConflicts: expandedSetting.potentialConflicts.map((c) =>
+          replaceUserPlaceholders(c, protagonistName),
+        ),
       };
     }
 
@@ -1144,22 +1184,26 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     };
 
     // 4. Supporting Characters
-    const processedCharacters = supportingCharacters.map(char => ({
+    const processedCharacters = supportingCharacters.map((char) => ({
       ...char,
       name: replaceUserPlaceholders(char.name, protagonistName),
       description: replaceUserPlaceholders(char.description, protagonistName),
       role: replaceUserPlaceholders(char.role, protagonistName),
       relationship: replaceUserPlaceholders(char.relationship, protagonistName),
-      traits: char.traits?.map(t => replaceUserPlaceholders(t, protagonistName))
+      traits: char.traits?.map((t) =>
+        replaceUserPlaceholders(t, protagonistName),
+      ),
     }));
 
     // 5. Imported Lorebook Entries
     // We map importedEntries to a new array to avoid mutating the source state if user cancels
-    const processedEntries = importedEntries.map(e => ({
+    const processedEntries = importedEntries.map((e) => ({
       ...e,
       name: replaceUserPlaceholders(e.name, protagonistName),
       description: replaceUserPlaceholders(e.description, protagonistName),
-      keywords: e.keywords.map(k => replaceUserPlaceholders(k, protagonistName))
+      keywords: e.keywords.map((k) =>
+        replaceUserPlaceholders(k, protagonistName),
+      ),
     }));
 
     const wizardData: WizardData = {
@@ -1169,7 +1213,8 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
       settingSeed: processedSettingSeed,
       expandedSetting: processedExpandedSetting || undefined,
       protagonist: protagonist || undefined,
-      characters: processedCharacters.length > 0 ? processedCharacters : undefined,
+      characters:
+        processedCharacters.length > 0 ? processedCharacters : undefined,
       writingStyle: {
         pov: selectedPOV,
         tense: selectedTense,
@@ -1219,7 +1264,8 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     // Create the story using the store, including any imported entries
     const newStory = await story.createStoryFromWizard({
       ...storyData,
-      importedEntries: processedEntries.length > 0 ? processedEntries : undefined,
+      importedEntries:
+        processedEntries.length > 0 ? processedEntries : undefined,
     });
 
     // Load and navigate to the story
@@ -1562,13 +1608,16 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
       }
 
       // Add to array - use reassignment instead of .push() to avoid state_unsafe_mutation
-      importedLorebooks = [...importedLorebooks, {
-        id: crypto.randomUUID(),
-        filename: file.name,
-        result,
-        entries: classifiedEntries,
-        expanded: true,
-      }];
+      importedLorebooks = [
+        ...importedLorebooks,
+        {
+          id: crypto.randomUUID(),
+          filename: file.name,
+          result,
+          entries: classifiedEntries,
+          expanded: true,
+        },
+      ];
 
       isImporting = false;
     } catch (err) {
@@ -1584,49 +1633,52 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   }
 
   async function handleSelectLorebookFromVault(vaultLorebook: VaultLorebook) {
-    const entries = vaultLorebook.entries.map(e => ({
+    const entries = vaultLorebook.entries.map((e) => ({
       ...e,
     }));
 
     // Use reassignment instead of .push() to avoid state_unsafe_mutation error
-    importedLorebooks = [...importedLorebooks, {
-      id: crypto.randomUUID(),
-      filename: `${vaultLorebook.name} (from Vault)`,
-      result: {
-        success: true,
-        entries: entries,
-        errors: [],
-        warnings: [],
-        metadata: vaultLorebook.metadata || {
-          format: 'aventura',
-          totalEntries: entries.length,
-          importedEntries: entries.length,
-          skippedEntries: 0,
+    importedLorebooks = [
+      ...importedLorebooks,
+      {
+        id: crypto.randomUUID(),
+        filename: `${vaultLorebook.name} (from Vault)`,
+        result: {
+          success: true,
+          entries: entries,
+          errors: [],
+          warnings: [],
+          metadata: vaultLorebook.metadata || {
+            format: "aventura",
+            totalEntries: entries.length,
+            importedEntries: entries.length,
+            skippedEntries: 0,
+          },
         },
+        entries: entries,
+        expanded: true,
       },
-      entries: entries,
-      expanded: true,
-    }];
+    ];
     showLorebookVaultPicker = false;
   }
 
   async function handleSaveLorebookToVault(lb: ImportedLorebookItem) {
     try {
-      const name = lb.filename.replace(/\.json$/i, '');
-      
-      const vaultEntries: VaultLorebookEntry[] = lb.entries.map(e => {
+      const name = lb.filename.replace(/\.json$/i, "");
+
+      const vaultEntries: VaultLorebookEntry[] = lb.entries.map((e) => {
         const { originalData, ...rest } = e;
         return rest;
       });
 
       await lorebookVault.saveFromImport(
-        name, 
-        vaultEntries, 
-        lb.result, 
-        lb.filename
+        name,
+        vaultEntries,
+        lb.result,
+        lb.filename,
       );
     } catch (error) {
-      console.error('Failed to save lorebook to vault:', error);
+      console.error("Failed to save lorebook to vault:", error);
     }
   }
 
@@ -1640,7 +1692,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   function toggleLorebookExpanded(id: string) {
     // Use immutable update pattern to avoid state_unsafe_mutation
     importedLorebooks = importedLorebooks.map((lb) =>
-      lb.id === id ? { ...lb, expanded: !lb.expanded } : lb
+      lb.id === id ? { ...lb, expanded: !lb.expanded } : lb,
     );
   }
 
@@ -1662,7 +1714,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     clearSettingEditState();
 
     // Add NPCs to supporting characters
-    const importedNpcs: GeneratedCharacter[] = scenario.npcs.map(npc => ({
+    const importedNpcs: GeneratedCharacter[] = scenario.npcs.map((npc) => ({
       name: npc.name,
       role: npc.role,
       description: npc.description,
@@ -1672,10 +1724,12 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
 
     // Add to supporting characters (replacing any previous imported NPCs)
     if (importedCardNpcs.length > 0) {
-      const prevImportedNames = new Set(importedCardNpcs.map(n => n.name));
-      supportingCharacters = supportingCharacters.filter(c => !prevImportedNames.has(c.name));
+      const prevImportedNames = new Set(importedCardNpcs.map((n) => n.name));
+      supportingCharacters = supportingCharacters.filter(
+        (c) => !prevImportedNames.has(c.name),
+      );
     }
-    
+
     supportingCharacters = [...supportingCharacters, ...importedNpcs];
     importedCardNpcs = importedNpcs;
 
@@ -1684,7 +1738,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
       cardImportedTitle = scenario.name;
       storyTitle = scenario.name;
     }
-    
+
     if (scenario.firstMessage) {
       cardImportedFirstMessage = scenario.firstMessage;
       cardImportedAlternateGreetings = scenario.alternateGreetings || [];
@@ -1706,7 +1760,19 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
       await scenarioVault.load();
     }
 
-    const npcs = importedCardNpcs.length > 0 ? importedCardNpcs : supportingCharacters.map(c => ({
+    const npcs =
+      importedCardNpcs.length > 0
+        ? importedCardNpcs
+        : supportingCharacters.map((c) => ({
+            name: c.name,
+            role: c.role,
+            description: c.description,
+            relationship: c.relationship,
+            traits: c.traits || [],
+          }));
+
+    // Convert GeneratedCharacter to VaultScenarioNpc
+    const vaultNpcs = npcs.map((c) => ({
       name: c.name,
       role: c.role,
       description: c.description,
@@ -1714,29 +1780,20 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
       traits: c.traits || [],
     }));
 
-    // Convert GeneratedCharacter to VaultScenarioNpc
-    const vaultNpcs = npcs.map(c => ({
-      name: c.name,
-      role: c.role,
-      description: c.description,
-      relationship: c.relationship,
-      traits: c.traits || []
-    }));
-
     await scenarioVault.saveFromWizard(
-      storyTitle || 'Untitled Scenario',
+      storyTitle || "Untitled Scenario",
       settingSeed,
       vaultNpcs,
       {
         description: expandedSetting?.description,
         firstMessage: cardImportedFirstMessage || undefined,
         alternateGreetings: cardImportedAlternateGreetings,
-        tags: ['wizard'],
-      }
+        tags: ["wizard"],
+      },
     );
 
     savedScenarioToVaultConfirm = true;
-    setTimeout(() => savedScenarioToVaultConfirm = false, 2000);
+    setTimeout(() => (savedScenarioToVaultConfirm = false), 2000);
   }
 
   // Character Card Import handler
@@ -1858,8 +1915,6 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     if (!text) return text;
     return text.replace(/\{\{user\}\}/gi, name);
   }
-
-
 </script>
 
 <div
@@ -1868,7 +1923,9 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
   aria-modal="true"
 >
   <!-- Mobile: full screen with safe area; Desktop: centered modal -->
-  <div class="card w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-hidden flex flex-col rounded-none sm:rounded-xl pt-[env(safe-area-inset-top)] sm:pt-4">
+  <div
+    class="card w-full h-full sm:h-auto sm:max-w-3xl sm:max-h-[90vh] overflow-hidden flex flex-col rounded-none sm:rounded-xl pt-[env(safe-area-inset-top)] sm:pt-4"
+  >
     <!-- Header -->
     <div
       class="flex items-center justify-between border-b border-surface-700 pb-4 shrink-0 px-2"
@@ -2024,12 +2081,10 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
               <!-- Vault Import -->
               <button
                 class="card bg-surface-900 border-dashed border-2 border-surface-600 p-6 text-center hover:border-accent-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[140px]"
-                onclick={() => showLorebookVaultPicker = true}
+                onclick={() => (showLorebookVaultPicker = true)}
               >
                 <Archive class="h-8 w-8 mb-2 text-surface-500" />
-                <p class="text-surface-300 font-medium">
-                  Add from Vault
-                </p>
+                <p class="text-surface-300 font-medium">Add from Vault</p>
                 <p class="text-xs text-surface-500 mt-1">
                   Use processed lorebooks
                 </p>
@@ -2122,7 +2177,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                       {/if}
                     </div>
                     <div class="flex items-center gap-2 z-10">
-                      {#if !lorebook.filename.includes('(from Vault)')}
+                      {#if !lorebook.filename.includes("(from Vault)")}
                         <button
                           class="flex items-center gap-1 text-xs text-surface-400 hover:text-accent-400 transition-colors p-1"
                           onclick={(e) => {
@@ -2201,8 +2256,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                             <p
                               class="text-xs text-surface-500 text-center py-2"
                             >
-                              ...and {lorebook.entries.length - 10} more
-                              entries
+                              ...and {lorebook.entries.length - 10} more entries
                             </p>
                           {/if}
                         </div>
@@ -2210,8 +2264,7 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
 
                       {#if lorebook.result.warnings.length > 0}
                         <div class="text-xs text-amber-400">
-                          {lorebook.result.warnings.length} warning(s) during
-                          import
+                          {lorebook.result.warnings.length} warning(s) during import
                         </div>
                       {/if}
                     </div>
@@ -2284,31 +2337,38 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
             </div>
           {/if}
         </div>
-{:else if currentStep === 4}
+      {:else if currentStep === 4}
         <!-- Step 4: Setting -->
         <div class="space-y-4 overflow-x-hidden">
           <!-- Vault Picker Modal -->
           {#if showScenarioVaultPicker}
             <VaultScenarioPicker
               onSelect={handleSelectScenarioFromVault}
-              onClose={() => showScenarioVaultPicker = false}
+              onClose={() => (showScenarioVaultPicker = false)}
             />
           {/if}
 
           <!-- Starter Scenarios -->
           <div>
-            <p class="text-xs text-surface-500 mb-2">Tap a starter scenario or write your own below</p>
-            
+            <p class="text-xs text-surface-500 mb-2">
+              Tap a starter scenario or write your own below
+            </p>
+
             <!-- Desktop Grid (3 columns) -->
             <div class="hidden sm:grid sm:gap-2 sm:grid-cols-3">
               {#each QUICK_START_SEEDS as seed (seed.id)}
                 {@const Icon = templateIcons[seed.id] ?? Sparkles}
                 <button
                   onclick={() => selectScenario(seed.id)}
-                  class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 {selectedScenarioId === seed.id ? 'border-accent-500 bg-accent-500/10' : ''}"
+                  class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 {selectedScenarioId ===
+                  seed.id
+                    ? 'border-accent-500 bg-accent-500/10'
+                    : ''}"
                 >
                   <Icon class="h-4 w-4 text-accent-400 shrink-0" />
-                  <span class="font-medium text-surface-100 text-sm truncate">{seed.name}</span>
+                  <span class="font-medium text-surface-100 text-sm truncate"
+                    >{seed.name}</span
+                  >
                 </button>
               {/each}
             </div>
@@ -2316,24 +2376,34 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
             <!-- Mobile Carousel (infinite scroll, centered on first item) -->
             <div class="sm:hidden relative">
               <!-- Fade edges -->
-              <div class="pointer-events-none absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-surface-800 to-transparent z-10"></div>
-              <div class="pointer-events-none absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-surface-800 to-transparent z-10"></div>
-              
+              <div
+                class="pointer-events-none absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-surface-800 to-transparent z-10"
+              ></div>
+              <div
+                class="pointer-events-none absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-surface-800 to-transparent z-10"
+              ></div>
+
               <!-- Scrollable container with tripled items for infinite effect -->
-              <div 
+              <div
                 bind:this={scenarioCarouselRef}
                 onscroll={handleCarouselScroll}
                 class="flex gap-2 overflow-x-auto py-1 scrollbar-hide"
               >
                 <!-- First copy (for seamless loop) -->
-                {#each QUICK_START_SEEDS as seed (seed.id + '-pre')}
+                {#each QUICK_START_SEEDS as seed (seed.id + "-pre")}
                   {@const Icon = templateIcons[seed.id] ?? Sparkles}
                   <button
                     onclick={() => selectScenario(seed.id)}
-                    class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 shrink-0 {selectedScenarioId === seed.id ? 'border-accent-500 bg-accent-500/10' : ''}"
+                    class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 shrink-0 {selectedScenarioId ===
+                    seed.id
+                      ? 'border-accent-500 bg-accent-500/10'
+                      : ''}"
                   >
                     <Icon class="h-4 w-4 text-accent-400 shrink-0" />
-                    <span class="font-medium text-surface-100 text-sm whitespace-nowrap">{seed.name}</span>
+                    <span
+                      class="font-medium text-surface-100 text-sm whitespace-nowrap"
+                      >{seed.name}</span
+                    >
                   </button>
                 {/each}
                 <!-- Original items (middle set) -->
@@ -2341,21 +2411,33 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                   {@const Icon = templateIcons[seed.id] ?? Sparkles}
                   <button
                     onclick={() => selectScenario(seed.id)}
-                    class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 shrink-0 {selectedScenarioId === seed.id ? 'border-accent-500 bg-accent-500/10' : ''}"
+                    class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 shrink-0 {selectedScenarioId ===
+                    seed.id
+                      ? 'border-accent-500 bg-accent-500/10'
+                      : ''}"
                   >
                     <Icon class="h-4 w-4 text-accent-400 shrink-0" />
-                    <span class="font-medium text-surface-100 text-sm whitespace-nowrap">{seed.name}</span>
+                    <span
+                      class="font-medium text-surface-100 text-sm whitespace-nowrap"
+                      >{seed.name}</span
+                    >
                   </button>
                 {/each}
                 <!-- Last copy (for seamless loop) -->
-                {#each QUICK_START_SEEDS as seed (seed.id + '-post')}
+                {#each QUICK_START_SEEDS as seed (seed.id + "-post")}
                   {@const Icon = templateIcons[seed.id] ?? Sparkles}
                   <button
                     onclick={() => selectScenario(seed.id)}
-                    class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 shrink-0 {selectedScenarioId === seed.id ? 'border-accent-500 bg-accent-500/10' : ''}"
+                    class="card flex items-center gap-2 px-3 py-2 text-left transition-all hover:border-accent-500/50 hover:bg-surface-700/50 shrink-0 {selectedScenarioId ===
+                    seed.id
+                      ? 'border-accent-500 bg-accent-500/10'
+                      : ''}"
                   >
                     <Icon class="h-4 w-4 text-accent-400 shrink-0" />
-                    <span class="font-medium text-surface-100 text-sm whitespace-nowrap">{seed.name}</span>
+                    <span
+                      class="font-medium text-surface-100 text-sm whitespace-nowrap"
+                      >{seed.name}</span
+                    >
                   </button>
                 {/each}
               </div>
@@ -2382,45 +2464,83 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                 onchange={handleCardImport}
               />
               {#if isImportingCard}
-                <Loader2 class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500 animate-spin" />
-                <p class="text-surface-300 text-xs sm:text-sm font-medium">Converting...</p>
+                <Loader2
+                  class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500 animate-spin"
+                />
+                <p class="text-surface-300 text-xs sm:text-sm font-medium">
+                  Converting...
+                </p>
               {:else}
-                <Upload class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500" />
-                <p class="text-surface-300 text-xs sm:text-sm font-medium">Import Card</p>
-                <p class="text-[10px] sm:text-xs text-surface-500 hidden sm:block">JSON or PNG</p>
+                <Upload
+                  class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500"
+                />
+                <p class="text-surface-300 text-xs sm:text-sm font-medium">
+                  Import Card
+                </p>
+                <p
+                  class="text-[10px] sm:text-xs text-surface-500 hidden sm:block"
+                >
+                  JSON or PNG
+                </p>
               {/if}
             </button>
 
             <!-- Load from Vault -->
             <button
               class="flex-1 sm:flex-none card bg-surface-900 border-dashed border-2 border-surface-600 p-2 sm:p-4 text-center hover:border-accent-500/50 transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[70px] sm:min-h-[100px]"
-              onclick={() => showScenarioVaultPicker = true}
+              onclick={() => (showScenarioVaultPicker = true)}
             >
-              <Archive class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500" />
-              <p class="text-surface-300 text-xs sm:text-sm font-medium">Load Vault</p>
-              <p class="text-[10px] sm:text-xs text-surface-500 hidden sm:block">Saved scenarios</p>
+              <Archive
+                class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500"
+              />
+              <p class="text-surface-300 text-xs sm:text-sm font-medium">
+                Load Vault
+              </p>
+              <p
+                class="text-[10px] sm:text-xs text-surface-500 hidden sm:block"
+              >
+                Saved scenarios
+              </p>
             </button>
 
             <!-- Save to Vault (always visible, disabled when no content) -->
             <button
-              class="flex-1 sm:flex-none card bg-surface-900 border-dashed border-2 border-surface-600 p-2 sm:p-4 text-center transition-colors flex flex-col items-center justify-center min-h-[70px] sm:min-h-[100px] {savedScenarioToVaultConfirm ? 'border-green-500/50 bg-green-500/10' : ''} {settingSeed.trim() ? 'hover:border-green-500/50 cursor-pointer' : 'opacity-50 cursor-not-allowed'}"
+              class="flex-1 sm:flex-none card bg-surface-900 border-dashed border-2 border-surface-600 p-2 sm:p-4 text-center transition-colors flex flex-col items-center justify-center min-h-[70px] sm:min-h-[100px] {savedScenarioToVaultConfirm
+                ? 'border-green-500/50 bg-green-500/10'
+                : ''} {settingSeed.trim()
+                ? 'hover:border-green-500/50 cursor-pointer'
+                : 'opacity-50 cursor-not-allowed'}"
               onclick={handleSaveScenarioToVault}
               disabled={!settingSeed.trim() || savedScenarioToVaultConfirm}
             >
               {#if savedScenarioToVaultConfirm}
-                <Check class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-green-400" />
-                <p class="text-green-300 text-xs sm:text-sm font-medium">Saved!</p>
+                <Check
+                  class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-green-400"
+                />
+                <p class="text-green-300 text-xs sm:text-sm font-medium">
+                  Saved!
+                </p>
               {:else}
-                <Archive class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500" />
-                <p class="text-surface-300 text-xs sm:text-sm font-medium">Save Vault</p>
-                <p class="text-[10px] sm:text-xs text-surface-500 hidden sm:block">For later use</p>
+                <Archive
+                  class="h-5 w-5 sm:h-6 sm:w-6 mb-1 sm:mb-2 text-surface-500"
+                />
+                <p class="text-surface-300 text-xs sm:text-sm font-medium">
+                  Save Vault
+                </p>
+                <p
+                  class="text-[10px] sm:text-xs text-surface-500 hidden sm:block"
+                >
+                  For later use
+                </p>
               {/if}
             </button>
           </div>
 
           <!-- Import Status / Error -->
           {#if importedCardNpcs.length > 0}
-            <div class="flex items-center justify-between bg-surface-800/50 p-2 rounded text-xs">
+            <div
+              class="flex items-center justify-between bg-surface-800/50 p-2 rounded text-xs"
+            >
               <span class="text-green-400 flex items-center gap-1">
                 <Check class="h-3 w-3" />
                 Imported: {importedCardNpcs.map((n) => n.name).join(", ")}
@@ -2514,8 +2634,12 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
           {/if}
 
           {#if expandedSetting}
-            <div class="card bg-surface-900 px-4 py-3 sm:pt-2 sm:pb-3 space-y-2 sm:space-y-1">
-              <div class="flex justify-end gap-3">
+            <div
+              class="card bg-surface-900 px-4 py-3 sm:pt-3 sm:pb-3 space-y-2 sm:space-y-1"
+            >
+              <div class="flex gap-3 sm:mb-2">
+                <p class="text-sm">Selected Setting</p>
+                <div class="flex-1"></div>
                 <button
                   class="flex items-center gap-1.5 text-xs font-medium text-surface-400 hover:text-surface-100 transition-colors"
                   onclick={editSetting}
@@ -2780,8 +2904,14 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                       title="Save this character to your vault for reuse"
                     >
                       <Archive class="h-3 w-3" />
-                      <span class="hidden sm:inline">{savedToVaultConfirm ? "Saved!" : "Save to Vault"}</span>
-                      <span class="sm:hidden">{savedToVaultConfirm ? "Saved" : "Save"}</span>
+                      <span class="hidden sm:inline"
+                        >{savedToVaultConfirm
+                          ? "Saved!"
+                          : "Save to Vault"}</span
+                      >
+                      <span class="sm:hidden"
+                        >{savedToVaultConfirm ? "Saved" : "Save"}</span
+                      >
                     </button>
                   </div>
                 </div>
@@ -2812,7 +2942,11 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                             ? 'animate-pulse'
                             : ''}"
                         />
-                        <span>{isElaboratingCharacter ? "Refining..." : "Refine"}</span>
+                        <span
+                          >{isElaboratingCharacter
+                            ? "Refining..."
+                            : "Refine"}</span
+                        >
                       </button>
                     </div>
                   </div>
@@ -2844,7 +2978,9 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
 
                   <!-- Guidance field for iterative refinement -->
                   <div class="pt-2 border-t border-surface-700">
-                    <label class="mb-1 block text-xs font-medium text-surface-400">
+                    <label
+                      class="mb-1 block text-xs font-medium text-surface-400"
+                    >
                       Refinement guidance (optional)
                     </label>
                     <textarea
@@ -2896,234 +3032,235 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
             {/if}
 
             <!-- Supporting Characters -->
-              <div class="space-y-3 pt-4 border-t border-surface-700">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <h3 class="font-medium text-surface-100">Supporting Cast</h3>
-                  <div class="grid grid-cols-3 sm:flex gap-2 w-full sm:w-auto">
-                    <button
-                      class="btn btn-secondary btn-sm flex items-center justify-center gap-1"
-                      onclick={() => (showSupportingVaultPicker = true)}
-                      disabled={showSupportingCharacterForm}
-                      title="Select from vault"
+            <div class="space-y-3 pt-4 border-t border-surface-700">
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <h3 class="font-medium text-surface-100">Supporting Cast</h3>
+                <div class="grid grid-cols-3 sm:flex gap-2 w-full sm:w-auto">
+                  <button
+                    class="btn btn-secondary btn-sm flex items-center justify-center gap-1"
+                    onclick={() => (showSupportingVaultPicker = true)}
+                    disabled={showSupportingCharacterForm}
+                    title="Select from vault"
+                  >
+                    <Archive class="h-3 w-3" />
+                    <span>Vault</span>
+                  </button>
+                  <button
+                    class="btn btn-secondary btn-sm flex items-center justify-center gap-1"
+                    onclick={openSupportingCharacterForm}
+                    disabled={showSupportingCharacterForm}
+                  >
+                    <Plus class="h-3 w-3" />
+                    <span>Add</span>
+                  </button>
+                  <button
+                    class="btn btn-secondary btn-sm flex items-center justify-center gap-1"
+                    onclick={generateCharacters}
+                    disabled={isGeneratingCharacters || !protagonist}
+                    title="Generate 3 AI characters at once"
+                  >
+                    {#if isGeneratingCharacters}
+                      <Loader2 class="h-3 w-3 animate-spin" />
+                      <span class="hidden sm:inline">Generating...</span>
+                    {:else}
+                      <Sparkles class="h-3 w-3" />
+                      <span class="sm:hidden">Gen 3</span>
+                      <span class="hidden sm:inline">Generate 3</span>
+                    {/if}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Supporting Character Form -->
+              {#if showSupportingCharacterForm}
+                <div class="card bg-surface-900 p-4 space-y-4">
+                  <p class="text-sm text-surface-400">
+                    {editingSupportingCharacterIndex !== null ? "Edit" : "Add"} a
+                    supporting character. You can use them as-is or have AI elaborate
+                    on them.
+                  </p>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        class="mb-1 block text-xs font-medium text-surface-400"
+                        >Name</label
+                      >
+                      <input
+                        type="text"
+                        bind:value={supportingCharacterName}
+                        placeholder="e.g., Lady Vivienne"
+                        class="input"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        class="mb-1 block text-xs font-medium text-surface-400"
+                        >Role</label
+                      >
+                      <input
+                        type="text"
+                        bind:value={supportingCharacterRole}
+                        placeholder="e.g., ally, antagonist, mentor..."
+                        class="input"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      class="mb-1 block text-xs font-medium text-surface-400"
+                      >Description</label
                     >
-                      <Archive class="h-3 w-3" />
-                      <span>Vault</span>
+                    <textarea
+                      bind:value={supportingCharacterDescription}
+                      placeholder="Physical appearance, personality, notable features..."
+                      class="input min-h-[60px] resize-none"
+                      rows="2"
+                    ></textarea>
+                  </div>
+
+                  <div>
+                    <label
+                      class="mb-1 block text-xs font-medium text-surface-400"
+                      >Relationship to Protagonist</label
+                    >
+                    <input
+                      type="text"
+                      bind:value={supportingCharacterRelationship}
+                      placeholder="e.g., Childhood friend, rival from academy..."
+                      class="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      class="mb-1 block text-xs font-medium text-surface-400"
+                      >Traits (comma-separated)</label
+                    >
+                    <input
+                      type="text"
+                      bind:value={supportingCharacterTraits}
+                      placeholder="e.g., cunning, loyal, mysterious..."
+                      class="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      class="mb-1 block text-xs font-medium text-surface-400"
+                      >Elaboration guidance (optional)</label
+                    >
+                    <textarea
+                      bind:value={supportingCharacterGuidance}
+                      placeholder="e.g., Make them more sinister, add a hidden agenda..."
+                      class="input min-h-[50px] resize-none text-sm"
+                      rows="2"
+                    ></textarea>
+                  </div>
+
+                  <div
+                    class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-2 border-t border-surface-700"
+                  >
+                    <button
+                      class="btn btn-secondary btn-sm flex items-center justify-center gap-1 col-span-1"
+                      onclick={useSupportingCharacterAsIs}
+                      disabled={!supportingCharacterName.trim()}
+                      title="Use character as entered"
+                    >
+                      <Check class="h-3 w-3" />
+                      <span>Use As-Is</span>
                     </button>
                     <button
-                      class="btn btn-secondary btn-sm flex items-center justify-center gap-1"
-                      onclick={openSupportingCharacterForm}
-                      disabled={showSupportingCharacterForm}
+                      class="btn btn-primary btn-sm flex items-center justify-center gap-1 col-span-1"
+                      onclick={elaborateSupportingCharacter}
+                      disabled={isElaboratingSupportingCharacter ||
+                        (!supportingCharacterName.trim() &&
+                          !supportingCharacterDescription.trim())}
+                      title="Have AI expand on character details"
                     >
-                      <Plus class="h-3 w-3" />
-                      <span>Add</span>
-                    </button>
-                    <button
-                      class="btn btn-secondary btn-sm flex items-center justify-center gap-1"
-                      onclick={generateCharacters}
-                      disabled={isGeneratingCharacters || !protagonist}
-                      title="Generate 3 AI characters at once"
-                    >
-                      {#if isGeneratingCharacters}
+                      {#if isElaboratingSupportingCharacter}
                         <Loader2 class="h-3 w-3 animate-spin" />
-                        <span class="hidden sm:inline">Generating...</span>
+                        <span>Elaborating...</span>
                       {:else}
                         <Sparkles class="h-3 w-3" />
-                        <span class="sm:hidden">Gen 3</span>
-                        <span class="hidden sm:inline">Generate 3</span>
+                        <span class="sm:hidden">Elaborate</span>
+                        <span class="hidden sm:inline">Elaborate with AI</span>
                       {/if}
+                    </button>
+                    <button
+                      class="btn btn-secondary btn-sm flex items-center justify-center gap-1 col-span-2 sm:w-auto"
+                      onclick={cancelSupportingCharacterForm}
+                    >
+                      <X class="h-3 w-3" />
+                      <span>Cancel</span>
                     </button>
                   </div>
                 </div>
+              {/if}
 
-                <!-- Supporting Character Form -->
-                {#if showSupportingCharacterForm}
-                  <div class="card bg-surface-900 p-4 space-y-4">
-                    <p class="text-sm text-surface-400">
-                      {editingSupportingCharacterIndex !== null
-                        ? "Edit"
-                        : "Add"} a supporting character. You can use them as-is or
-                      have AI elaborate on them.
-                    </p>
-
-                    <div class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label
-                          class="mb-1 block text-xs font-medium text-surface-400"
-                          >Name</label
+              <!-- Character List -->
+              {#if supportingCharacters.length > 0}
+                <div class="space-y-2">
+                  {#each supportingCharacters as char, index}
+                    <div class="card bg-surface-900 p-3">
+                      <div class="flex items-center gap-2 mb-2">
+                        <span class="font-medium text-surface-100"
+                          >{char.name}</span
                         >
-                        <input
-                          type="text"
-                          bind:value={supportingCharacterName}
-                          placeholder="e.g., Lady Vivienne"
-                          class="input"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          class="mb-1 block text-xs font-medium text-surface-400"
-                          >Role</label
+                        <span
+                          class="text-xs px-1.5 py-0.5 rounded bg-accent-500/20 text-accent-400"
+                          >{char.role}</span
                         >
-                        <input
-                          type="text"
-                          bind:value={supportingCharacterRole}
-                          placeholder="e.g., ally, antagonist, mentor..."
-                          class="input"
-                        />
                       </div>
-                    </div>
-
-                    <div>
-                      <label
-                        class="mb-1 block text-xs font-medium text-surface-400"
-                        >Description</label
-                      >
-                      <textarea
-                        bind:value={supportingCharacterDescription}
-                        placeholder="Physical appearance, personality, notable features..."
-                        class="input min-h-[60px] resize-none"
-                        rows="2"
-                      ></textarea>
-                    </div>
-
-                    <div>
-                      <label
-                        class="mb-1 block text-xs font-medium text-surface-400"
-                        >Relationship to Protagonist</label
-                      >
-                      <input
-                        type="text"
-                        bind:value={supportingCharacterRelationship}
-                        placeholder="e.g., Childhood friend, rival from academy..."
-                        class="input"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        class="mb-1 block text-xs font-medium text-surface-400"
-                        >Traits (comma-separated)</label
-                      >
-                      <input
-                        type="text"
-                        bind:value={supportingCharacterTraits}
-                        placeholder="e.g., cunning, loyal, mysterious..."
-                        class="input"
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        class="mb-1 block text-xs font-medium text-surface-400"
-                        >Elaboration guidance (optional)</label
-                      >
-                      <textarea
-                        bind:value={supportingCharacterGuidance}
-                        placeholder="e.g., Make them more sinister, add a hidden agenda..."
-                        class="input min-h-[50px] resize-none text-sm"
-                        rows="2"
-                      ></textarea>
-                    </div>
-
-                    <div
-                      class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-2 border-t border-surface-700"
-                    >
-                      <button
-                        class="btn btn-secondary btn-sm flex items-center justify-center gap-1 col-span-1"
-                        onclick={useSupportingCharacterAsIs}
-                        disabled={!supportingCharacterName.trim()}
-                        title="Use character as entered"
-                      >
-                        <Check class="h-3 w-3" />
-                        <span>Use As-Is</span>
-                      </button>
-                      <button
-                        class="btn btn-primary btn-sm flex items-center justify-center gap-1 col-span-1"
-                        onclick={elaborateSupportingCharacter}
-                        disabled={isElaboratingSupportingCharacter ||
-                          (!supportingCharacterName.trim() &&
-                            !supportingCharacterDescription.trim())}
-                        title="Have AI expand on character details"
-                      >
-                        {#if isElaboratingSupportingCharacter}
-                          <Loader2 class="h-3 w-3 animate-spin" />
-                          <span>Elaborating...</span>
-                        {:else}
-                          <Sparkles class="h-3 w-3" />
-                          <span class="sm:hidden">Elaborate</span>
-                          <span class="hidden sm:inline">Elaborate with AI</span>
-                        {/if}
-                      </button>
-                      <button
-                        class="btn btn-secondary btn-sm flex items-center justify-center gap-1 col-span-2 sm:w-auto"
-                        onclick={cancelSupportingCharacterForm}
-                      >
-                        <X class="h-3 w-3" />
-                        <span>Cancel</span>
-                      </button>
-                    </div>
-                  </div>
-                {/if}
-
-                <!-- Character List -->
-                {#if supportingCharacters.length > 0}
-                  <div class="space-y-2">
-                    {#each supportingCharacters as char, index}
-                      <div class="card bg-surface-900 p-3">
-                        <div class="flex items-center gap-2 mb-2">
-                          <span class="font-medium text-surface-100"
-                            >{char.name}</span
-                          >
-                          <span
-                            class="text-xs px-1.5 py-0.5 rounded bg-accent-500/20 text-accent-400"
-                            >{char.role}</span
-                          >
-                        </div>
-                        <p class="text-sm text-surface-300">
-                          {char.description}
+                      <p class="text-sm text-surface-300">
+                        {char.description}
+                      </p>
+                      {#if char.relationship}
+                        <p class="text-xs text-surface-400 mt-1">
+                          {char.relationship}
                         </p>
-                        {#if char.relationship}
-                          <p class="text-xs text-surface-400 mt-1">
-                            {char.relationship}
-                          </p>
-                        {/if}
-                        {#if char.traits && char.traits.length > 0}
-                          <div class="flex flex-wrap gap-2 mt-2">
-                            {#each char.traits as trait}
-                              <span
-                                class="px-2 py-1 rounded-md bg-surface-800 text-xs text-surface-300 border border-surface-700"
-                                >{trait}</span
-                              >
-                            {/each}
-                          </div>
-                        {/if}
-                        <div
-                          class="flex justify-center gap-3 mt-3 pt-2 border-t border-surface-800"
-                        >
-                          <button
-                            class="p-1.5 text-surface-400 hover:text-surface-100 hover:bg-surface-800 rounded-lg transition-colors"
-                            onclick={() => editSupportingCharacter(index)}
-                            title="Edit character"
-                          >
-                            <PenTool class="h-4 w-4" />
-                          </button>
-                          <button
-                            class="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                            onclick={() => deleteSupportingCharacter(index)}
-                            title="Delete character"
-                          >
-                            <Trash2 class="h-4 w-4" />
-                          </button>
+                      {/if}
+                      {#if char.traits && char.traits.length > 0}
+                        <div class="flex flex-wrap gap-2 mt-2">
+                          {#each char.traits as trait}
+                            <span
+                              class="px-2 py-1 rounded-md bg-surface-800 text-xs text-surface-300 border border-surface-700"
+                              >{trait}</span
+                            >
+                          {/each}
                         </div>
+                      {/if}
+                      <div
+                        class="flex justify-center gap-3 mt-3 pt-2 border-t border-surface-800"
+                      >
+                        <button
+                          class="p-1.5 text-surface-400 hover:text-surface-100 hover:bg-surface-800 rounded-lg transition-colors"
+                          onclick={() => editSupportingCharacter(index)}
+                          title="Edit character"
+                        >
+                          <PenTool class="h-4 w-4" />
+                        </button>
+                        <button
+                          class="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                          onclick={() => deleteSupportingCharacter(index)}
+                          title="Delete character"
+                        >
+                          <Trash2 class="h-4 w-4" />
+                        </button>
                       </div>
-                    {/each}
-                  </div>
-                {:else if !showSupportingCharacterForm}
-                  <p class="text-sm text-surface-500 italic">
-                    No supporting characters yet. Add one manually or generate
-                    multiple with AI.
-                  </p>
-                {/if}
-              </div>
+                    </div>
+                  {/each}
+                </div>
+              {:else if !showSupportingCharacterForm}
+                <p class="text-sm text-surface-500 italic">
+                  No supporting characters yet. Add one manually or generate
+                  multiple with AI.
+                </p>
+              {/if}
+            </div>
           {/if}
         </div>
       {:else if currentStep === 6}
@@ -3797,7 +3934,9 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
                   </button>
                 </div>
               {:else}
-                <div class="prose prose-invert prose-sm max-w-none max-h-64 overflow-y-auto">
+                <div
+                  class="prose prose-invert prose-sm max-w-none max-h-64 overflow-y-auto"
+                >
                   <p class="text-surface-300 whitespace-pre-wrap">
                     {generatedOpening?.scene || ""}
                   </p>
@@ -3854,7 +3993,9 @@ import { QUICK_START_SEEDS } from "$lib/services/templates";
     </div>
 
     <!-- Footer Navigation -->
-    <div class="flex justify-between border-t border-surface-700 pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pb-0 shrink-0">
+    <div
+      class="flex justify-between border-t border-surface-700 pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pb-0 shrink-0"
+    >
       <button
         class="btn btn-secondary flex items-center gap-1"
         onclick={prevStep}
