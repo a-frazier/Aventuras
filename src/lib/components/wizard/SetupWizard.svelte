@@ -3843,9 +3843,9 @@
           {/if}
 
           {#if storyTitle.trim()}
-            <div class="flex items-center gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
-                class="btn btn-secondary flex items-center gap-2"
+                class="btn btn-secondary flex w-full items-center justify-center gap-2 sm:w-auto"
                 onclick={generateOpeningScene}
                 disabled={isGeneratingOpening || isRefiningOpening}
               >
