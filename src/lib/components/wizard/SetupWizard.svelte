@@ -33,13 +33,7 @@
   } from "$lib/types";
   import { lorebookVault } from "$lib/stores/lorebookVault.svelte";
   import { scenarioVault } from "$lib/stores/scenarioVault.svelte";
-  import {
-    X,
-    ChevronLeft,
-    ChevronRight,
-    Sparkles,
-    Play,
-  } from "lucide-svelte";
+  import { X, ChevronLeft, ChevronRight, Sparkles, Play } from "lucide-svelte";
 
   import { QUICK_START_SEEDS } from "$lib/services/templates";
   import type { ImportedLorebookItem } from "./wizardTypes";
@@ -1307,8 +1301,6 @@
     }
   }
 
-
-
   async function handleSelectLorebookFromVault(vaultLorebook: VaultLorebook) {
     const entries = vaultLorebook.entries.map((e) => ({
       ...e,
@@ -1527,9 +1519,7 @@
       title: storyTitle,
       scene: selectedScene || "",
       initialLocation: {
-        name:
-          expandedSetting?.keyLocations?.[0]?.name ||
-          "Starting Location",
+        name: expandedSetting?.keyLocations?.[0]?.name || "Starting Location",
         description:
           expandedSetting?.keyLocations?.[0]?.description ||
           "The scene begins here.",
@@ -1588,7 +1578,7 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto py-4 px-2 min-h-0">
+    <div class="flex-1 overflow-y-auto pb-4 pt-1 px-2 min-h-0">
       {#if needsApiKey}
         <!-- API Key Warning -->
         <div class="flex flex-col items-center justify-center py-8 text-center">
@@ -1703,8 +1693,10 @@
           onCharacterGuidanceChange={(v) => (characterElaborationGuidance = v)}
           onSupportingNameChange={(v) => (supportingCharacterName = v)}
           onSupportingRoleChange={(v) => (supportingCharacterRole = v)}
-          onSupportingDescriptionChange={(v) => (supportingCharacterDescription = v)}
-          onSupportingRelationshipChange={(v) => (supportingCharacterRelationship = v)}
+          onSupportingDescriptionChange={(v) =>
+            (supportingCharacterDescription = v)}
+          onSupportingRelationshipChange={(v) =>
+            (supportingCharacterRelationship = v)}
           onSupportingTraitsChange={(v) => (supportingCharacterTraits = v)}
           onSupportingGuidanceChange={(v) => (supportingCharacterGuidance = v)}
           onUseManualCharacter={useManualCharacter}
@@ -1720,8 +1712,10 @@
           onElaborateSupportingCharacter={elaborateSupportingCharacter}
           onDeleteSupportingCharacter={deleteSupportingCharacter}
           onGenerateCharacters={generateCharacters}
-          onShowProtagonistVaultPicker={(show) => (showProtagonistVaultPicker = show)}
-          onShowSupportingVaultPicker={(show) => (showSupportingVaultPicker = show)}
+          onShowProtagonistVaultPicker={(show) =>
+            (showProtagonistVaultPicker = show)}
+          onShowSupportingVaultPicker={(show) =>
+            (showSupportingVaultPicker = show)}
           onSelectProtagonistFromVault={handleSelectProtagonistFromVault}
           onSelectSupportingFromVault={handleSelectSupportingFromVault}
         />
@@ -1739,13 +1733,16 @@
           {generatingPortraitName}
           {uploadingCharacterName}
           {portraitError}
-          onProtagonistDescriptorsChange={(v) => (protagonistVisualDescriptors = v)}
+          onProtagonistDescriptorsChange={(v) =>
+            (protagonistVisualDescriptors = v)}
           onGenerateProtagonistPortrait={generateProtagonistPortrait}
           onRemoveProtagonistPortrait={removeProtagonistPortrait}
           onProtagonistPortraitUpload={handleProtagonistPortraitUpload}
           onSupportingDescriptorsChange={(name, v) => {
             supportingCharacterVisualDescriptors[name] = v;
-            supportingCharacterVisualDescriptors = { ...supportingCharacterVisualDescriptors };
+            supportingCharacterVisualDescriptors = {
+              ...supportingCharacterVisualDescriptors,
+            };
           }}
           onGenerateSupportingPortrait={generateSupportingCharacterPortrait}
           onRemoveSupportingPortrait={removeSupportingCharacterPortrait}

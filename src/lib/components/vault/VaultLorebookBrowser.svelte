@@ -52,24 +52,20 @@
 </script>
 
 <div class="space-y-3">
-  <!-- Header -->
-  <div class="flex items-center gap-2">
-    <Archive class="h-4 w-4 text-accent-400" />
-    <h3 class="text-sm font-medium text-surface-200">Add from Vault</h3>
-  </div>
-
   <!-- Search -->
-  <div class="relative">
-    <Search
-      class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500"
-    />
-    <input
-      type="text"
-      bind:value={searchQuery}
-      placeholder="Search lorebooks..."
-      class="w-full rounded-lg border border-surface-600 bg-surface-800 pl-10 pr-3 py-2 text-sm text-surface-100 placeholder-surface-500 focus:border-accent-500 focus:outline-none"
-    />
-  </div>
+  {#if lorebookVault.lorebooks.length > 0}
+    <div class="relative">
+      <Search
+        class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500"
+      />
+      <input
+        type="text"
+        bind:value={searchQuery}
+        placeholder="Search lorebooks..."
+        class="w-full rounded-lg border border-surface-600 bg-surface-800 pl-10 pr-3 py-2 text-sm text-surface-100 placeholder-surface-500 focus:border-accent-500 focus:outline-none"
+      />
+    </div>
+  {/if}
 
   <!-- Lorebook List -->
   <div class="max-h-64 overflow-y-auto">

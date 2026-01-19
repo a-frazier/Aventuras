@@ -37,7 +37,7 @@
   const importedVaultLorebookIds = $derived(
     importedLorebooks
       .filter((lb) => lb.filename.includes("(from Vault)"))
-      .map((lb) => lb.id)
+      .map((lb) => lb.id),
   );
 
   // Combined summary for display
@@ -57,10 +57,24 @@
 </script>
 
 <div class="space-y-4">
-  <p class="text-surface-400 text-sm">
-    Select lorebooks from your vault to populate your world with characters,
-    locations, and lore. This step is optional.
-  </p>
+  <div class="space-y-1">
+    <div class="flex items-center gap-2">
+      <Archive class="h-4 w-4 text-accent-400" />
+      <h3 class="text-sm font-medium text-surface-200">Add from Vault</h3>
+    </div>
+    <p class="text-surface-400 text-sm">
+      Select lorebooks from your vault to populate your world with characters,
+      locations, and lore. This step is optional.
+    </p>
+    <!-- Inline Vault Browser (Moved up to be close to description) -->
+    <div class="pt-0">
+      <VaultLorebookBrowser
+        onSelect={onSelectFromVault}
+        {onNavigateToVault}
+        importedLorebookIds={importedVaultLorebookIds}
+      />
+    </div>
+  </div>
 
   {#if importError}
     <div
@@ -71,7 +85,12 @@
     </div>
   {/if}
 
-  <!-- List of Imported Lorebooks -->
+  <!-- Divider if there are items -->
+  {#if importedLorebooks.length > 0}
+    <div class="border-t border-surface-700 my-4"></div>
+  {/if}
+
+  <!-- List of Imported Lorebooks (Moved below browser) -->
   {#if importedLorebooks.length > 0}
     <div class="space-y-2">
       <div class="flex items-center justify-between">
@@ -87,8 +106,10 @@
       </div>
 
       {#each importedLorebooks as lorebook (lorebook.id)}
-        <div 
-          class="card bg-surface-800 border border-surface-700 p-3 transition-all {lorebook.isLoading ? 'animate-pulse' : ''}"
+        <div
+          class="card bg-surface-800 border border-surface-700 p-3 transition-all {lorebook.isLoading
+            ? 'animate-pulse'
+            : ''}"
           transition:slide
         >
           <!-- Header Row -->
@@ -100,7 +121,9 @@
               disabled={lorebook.isLoading}
             >
               <ChevronRight
-                class="h-4 w-4 text-surface-500 transition-transform duration-200 {lorebook.expanded ? 'rotate-90' : ''}"
+                class="h-4 w-4 text-surface-500 transition-transform duration-200 {lorebook.expanded
+                  ? 'rotate-90'
+                  : ''}"
               />
             </button>
 
@@ -129,12 +152,13 @@
                   </span>
                 {/if}
               </div>
-              
+
               {#if lorebook.isLoading}
                 <p class="text-xs text-surface-400 mt-0.5">
                   {lorebook.loadingMessage || "Processing..."}
                   {#if lorebook.classificationProgress}
-                    ({lorebook.classificationProgress.current}/{lorebook.classificationProgress.total})
+                    ({lorebook.classificationProgress.current}/{lorebook
+                      .classificationProgress.total})
                   {/if}
                 </p>
               {:else}
@@ -166,7 +190,9 @@
                 <div
                   class="bg-accent-500 h-1.5 rounded-full transition-all duration-300"
                   style="width: {lorebook.classificationProgress.total > 0
-                    ? (lorebook.classificationProgress.current / lorebook.classificationProgress.total) * 100
+                    ? (lorebook.classificationProgress.current /
+                        lorebook.classificationProgress.total) *
+                      100
                     : 0}%"
                 ></div>
               </div>
@@ -179,7 +205,9 @@
               {#each Object.entries(getTypeCounts(lorebook.entries)) as [type, count]}
                 {#if count > 0}
                   <span
-                    class="px-2 py-0.5 rounded-full bg-surface-700 text-xs {getTypeColor(type as EntryType)}"
+                    class="px-2 py-0.5 rounded-full bg-surface-700 text-xs {getTypeColor(
+                      type as EntryType,
+                    )}"
                   >
                     {type}: {count}
                   </span>
@@ -205,7 +233,9 @@
                       class="flex items-center gap-2 text-sm p-2 rounded bg-surface-900"
                     >
                       <span
-                        class="px-1.5 py-0.5 rounded text-xs {getTypeColor(entry.type)} bg-surface-700"
+                        class="px-1.5 py-0.5 rounded text-xs {getTypeColor(
+                          entry.type,
+                        )} bg-surface-700"
                       >
                         {entry.type}
                       </span>
@@ -248,16 +278,4 @@
       </div>
     {/if}
   {/if}
-
-  <!-- Divider -->
-  {#if importedLorebooks.length > 0}
-    <div class="border-t border-surface-700 my-4"></div>
-  {/if}
-
-  <!-- Inline Vault Browser -->
-  <VaultLorebookBrowser
-    onSelect={onSelectFromVault}
-    onNavigateToVault={onNavigateToVault}
-    importedLorebookIds={importedVaultLorebookIds}
-  />
 </div>
