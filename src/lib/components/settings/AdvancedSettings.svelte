@@ -89,7 +89,7 @@
       <div class="flex items-center gap-2">
         <button
           class="text-xs text-surface-400 hover:text-surface-200"
-          onclick={() => settings.resetLorebookClassifierSettings()}
+          onclick={() => settings.resetLorebookClassifierSpecificSettings()}
           title="Reset to default"
         >
           <RotateCcw class="h-3 w-3" />
@@ -109,17 +109,17 @@
         <!-- Batch Size -->
         <div>
           <label class="mb-1 block text-xs font-medium text-surface-400">
-            Batch Size: {settings.systemServicesSettings.lorebookClassifier?.batchSize ?? 50}
+            Batch Size: {settings.serviceSpecificSettings.lorebookClassifier?.batchSize ?? 50}
           </label>
           <input
             type="range"
             min="10"
             max="100"
             step="10"
-            value={settings.systemServicesSettings.lorebookClassifier?.batchSize ?? 50}
+            value={settings.serviceSpecificSettings.lorebookClassifier?.batchSize ?? 50}
             oninput={(e) => {
-              settings.systemServicesSettings.lorebookClassifier.batchSize = parseInt(e.currentTarget.value);
-              settings.saveSystemServicesSettings();
+              settings.serviceSpecificSettings.lorebookClassifier.batchSize = parseInt(e.currentTarget.value);
+              settings.saveServiceSpecificSettings();
             }}
             class="w-full h-2"
           />
@@ -132,17 +132,17 @@
         <!-- Max Concurrent -->
         <div>
           <label class="mb-1 block text-xs font-medium text-surface-400">
-            Max Concurrent Requests: {settings.systemServicesSettings.lorebookClassifier?.maxConcurrent ?? 5}
+            Max Concurrent Requests: {settings.serviceSpecificSettings.lorebookClassifier?.maxConcurrent ?? 5}
           </label>
           <input
             type="range"
             min="1"
             max="10"
             step="1"
-            value={settings.systemServicesSettings.lorebookClassifier?.maxConcurrent ?? 5}
+            value={settings.serviceSpecificSettings.lorebookClassifier?.maxConcurrent ?? 5}
             oninput={(e) => {
-              settings.systemServicesSettings.lorebookClassifier.maxConcurrent = parseInt(e.currentTarget.value);
-              settings.saveSystemServicesSettings();
+              settings.serviceSpecificSettings.lorebookClassifier.maxConcurrent = parseInt(e.currentTarget.value);
+              settings.saveServiceSpecificSettings();
             }}
             class="w-full h-2"
           />

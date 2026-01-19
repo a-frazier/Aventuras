@@ -2587,6 +2587,11 @@ class SettingsStore {
     await this.saveSystemServicesSettings();
   }
 
+  async resetLorebookClassifierSpecificSettings() {
+    this.serviceSpecificSettings.lorebookClassifier = getDefaultLorebookClassifierSpecificSettings();
+    await this.saveServiceSpecificSettings();
+  }
+
   async resetMemorySettings() {
     const customModel = this.providerPreset === 'custom' ? this.getFirstModelFromDefaultProfile() : null;
     this.systemServicesSettings.memory = getDefaultMemorySettingsForProvider(this.providerPreset, customModel);
