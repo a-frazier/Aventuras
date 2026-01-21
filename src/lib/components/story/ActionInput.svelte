@@ -1025,12 +1025,25 @@
           })();
         }
 
-        // Phase 2.5: Trigger TTS for auto-play if enabled (background, non-blocking)
-        // Do this IMMEDIATELY after text generation is complete, before classification
+        // Phase 2.5: Trigger TTS for auto-play if enabled
+        // If translation is enabled, wait for it first so TTS uses translated content
         const ttsSettings = settings.systemServicesSettings.tts;
         if (ttsSettings.enabled && ttsSettings.autoPlay) {
-          emitTTSQueued(narrationEntry.id, fullResponse);
-          log("TTS queued for auto-play", { entryId: narrationEntry.id });
+          if (translationPromise) {
+            // Wait for translation to complete before TTS so entry.translatedContent is available
+            translationPromise.then(() => {
+              emitTTSQueued(narrationEntry.id, fullResponse);
+              log("TTS queued for auto-play (after translation)", { entryId: narrationEntry.id });
+            }).catch(() => {
+              // Translation failed, still trigger TTS with original content
+              emitTTSQueued(narrationEntry.id, fullResponse);
+              log("TTS queued for auto-play (translation failed)", { entryId: narrationEntry.id });
+            });
+          } else {
+            // No translation enabled, trigger TTS immediately
+            emitTTSQueued(narrationEntry.id, fullResponse);
+            log("TTS queued for auto-play", { entryId: narrationEntry.id });
+          }
         }
 
         // Phase 3: Classify the response to extract world state changes
