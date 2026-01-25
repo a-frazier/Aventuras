@@ -20,6 +20,7 @@
 		leftIcon?: typeof import("lucide-svelte").Search;
 		rightIcon?: typeof import("lucide-svelte").Search;
 		label?: string;
+		fullWidth?: boolean;
 	};
 
 	let {
@@ -31,6 +32,7 @@
 		leftIcon,
 		rightIcon,
 		label,
+		fullWidth = true,
 		...restProps
 	}: Props = $props();
 
@@ -38,13 +40,14 @@
 </script>
 
 {#if label}
-	<div class="flex flex-col">
+	<div class={cn("flex flex-col", fullWidth && "w-full")}>
 		<Label class="mb-2">{label}</Label>
 		{#if type === "file"}
 			<input
 				bind:this={ref}
 				class={cn(
-					"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 w-full rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+					"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+					fullWidth && "w-full",
 					className,
 				)}
 				type="file"
@@ -53,7 +56,7 @@
 				{...restProps}
 			/>
 		{:else if type === "password"}
-			<div class="relative flex w-full">
+			<div class={cn("relative flex", fullWidth && "w-full")}>
 				{#if leftIcon}
 					<div
 						class="absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-muted-foreground"
@@ -64,7 +67,8 @@
 				<input
 					bind:this={ref}
 					class={cn(
-						"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 w-full rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+						"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+						fullWidth && "w-full",
 						leftIcon && "pl-10",
 						"pr-10",
 						className,
@@ -90,7 +94,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="relative flex w-full">
+			<div class={cn("relative flex", fullWidth && "w-full")}>
 				{#if leftIcon}
 					<div
 						class="absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-muted-foreground"
@@ -101,7 +105,8 @@
 				<input
 					bind:this={ref}
 					class={cn(
-						"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 w-full rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+						"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+						fullWidth && "w-full",
 						leftIcon && "pl-10",
 						rightIcon && "pr-10",
 						leftIcon && rightIcon && "px-10",
@@ -125,7 +130,8 @@
 	<input
 		bind:this={ref}
 		class={cn(
-			"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 w-full rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+			"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+			fullWidth && "w-full",
 			className,
 		)}
 		type="file"
@@ -134,7 +140,7 @@
 		{...restProps}
 	/>
 {:else if type === "password"}
-	<div class="relative flex w-full">
+	<div class={cn("relative flex", fullWidth && "w-full")}>
 		{#if leftIcon}
 			<div
 				class="absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-muted-foreground"
@@ -145,7 +151,8 @@
 		<input
 			bind:this={ref}
 			class={cn(
-				"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 w-full rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+				"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+				fullWidth && "w-full",
 				leftIcon && "pl-10",
 				"pr-10",
 				className,
@@ -171,7 +178,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="relative flex w-full">
+	<div class={cn("relative flex", fullWidth && "w-full")}>
 		{#if leftIcon}
 			<div
 				class="absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-muted-foreground"
@@ -182,7 +189,8 @@
 		<input
 			bind:this={ref}
 			class={cn(
-				"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 w-full rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+				"border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring flex h-10 rounded-md border px-3 py-2 text-base file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+				fullWidth && "w-full",
 				leftIcon && "pl-10",
 				rightIcon && "pr-10",
 				leftIcon && rightIcon && "px-10",

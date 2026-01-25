@@ -2,38 +2,37 @@
   import { settings } from "$lib/stores/settings.svelte";
   import type { ThemeId } from "$lib/types";
   import { Switch } from "$lib/components/ui/switch";
+  import { Label } from "$lib/components/ui/label";
+  import * as Select from "$lib/components/ui/select";
   import { Button } from "$lib/components/ui/button";
   import { getSupportedLanguages } from "$lib/services/ai/translation";
-  import {
-    Download,
-    RefreshCw,
-    Loader2,
-    Languages,
-  } from "lucide-svelte";
+  import { Download, RefreshCw, Loader2, Languages } from "lucide-svelte";
 
-  const themes: Array<{ value: ThemeId; label: string; description: string }> = [
-    { value: "dark", label: "Dark", description: "Modern dark theme" },
-    {
-      value: "light",
-      label: "Light (Paper)",
-      description: "Clean paper-like warm tones with amber accents",
-    },
-    {
-      value: "light-solarized",
-      label: "Light (Solarized)",
-      description: "Classic Solarized color scheme with cream backgrounds",
-    },
-    {
-      value: "retro-console",
-      label: "Retro Console",
-      description: "CRT aesthetic inspired by PS2-era games and Serial Experiments Lain",
-    },
-    {
-      value: "fallen-down",
-      label: "Fallen Down",
-      description: "* The shadows deepen. Your adventure continues.",
-    },
-  ];
+  const themes: Array<{ value: ThemeId; label: string; description: string }> =
+    [
+      { value: "dark", label: "Dark", description: "Modern dark theme" },
+      {
+        value: "light",
+        label: "Light (Paper)",
+        description: "Clean paper-like warm tones with amber accents",
+      },
+      {
+        value: "light-solarized",
+        label: "Light (Solarized)",
+        description: "Classic Solarized color scheme with cream backgrounds",
+      },
+      {
+        value: "retro-console",
+        label: "Retro Console",
+        description:
+          "CRT aesthetic inspired by PS2-era games and Serial Experiments Lain",
+      },
+      {
+        value: "fallen-down",
+        label: "Fallen Down",
+        description: "* The shadows deepen. Your adventure continues.",
+      },
+    ];
 
   const fontSizes = [
     { value: "small", label: "Small" },
@@ -45,54 +44,73 @@
 <div class="space-y-4">
   <!-- Theme Selection -->
   <div>
-    <label class="mb-2 block text-sm font-medium text-foreground">Theme</label>
-    <select
-      class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    <Label class="mb-2 block">Theme</Label>
+    <Select.Root
+      type="single"
       value={settings.uiSettings.theme}
-      onchange={(e) =>
-        settings.setTheme(e.currentTarget.value as ThemeId)}
+      onValueChange={(v) => settings.setTheme(v as ThemeId)}
     >
-      {#each themes as theme}
-        <option value={theme.value}>{theme.label}</option>
-      {/each}
-    </select>
+      <Select.Trigger class="h-10 w-full">
+        {themes.find((t) => t.value === settings.uiSettings.theme)?.label ??
+          "Select theme"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each themes as theme}
+          <Select.Item value={theme.value} label={theme.label}>
+            {theme.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
     <p class="mt-1 text-xs text-muted-foreground">
-      {themes.find((t) => t.value === settings.uiSettings.theme)?.description ?? ""}
+      {themes.find((t) => t.value === settings.uiSettings.theme)?.description ??
+        ""}
     </p>
   </div>
 
   <!-- Font Size -->
   <div>
-    <label class="mb-2 block text-sm font-medium text-foreground">Font Size</label>
-    <select
-      class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    <Label class="mb-2 block">Font Size</Label>
+    <Select.Root
+      type="single"
       value={settings.uiSettings.fontSize}
-      onchange={(e) =>
-        settings.setFontSize(e.currentTarget.value as "small" | "medium" | "large")}
+      onValueChange={(v) =>
+        settings.setFontSize(v as "small" | "medium" | "large")}
     >
-      {#each fontSizes as size}
-        <option value={size.value}>{size.label}</option>
-      {/each}
-    </select>
+      <Select.Trigger class="h-10 w-full">
+        {fontSizes.find((s) => s.value === settings.uiSettings.fontSize)
+          ?.label ?? "Select size"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each fontSizes as size}
+          <Select.Item value={size.value} label={size.label}>
+            {size.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
   </div>
 
   <!-- Word Count Toggle -->
   <div class="flex items-center justify-between">
-    <label class="text-sm font-medium text-foreground">Show Word Count</label>
-    <input
-      type="checkbox"
+    <div>
+      <Label>Word Count</Label>
+      <p class="text-xs text-muted-foreground">
+        Display current story word count in the status bar
+      </p>
+    </div>
+    <Switch
       checked={settings.uiSettings.showWordCount}
-      onchange={() => {
-        settings.uiSettings.showWordCount = !settings.uiSettings.showWordCount;
+      onCheckedChange={(v) => {
+        settings.uiSettings.showWordCount = v;
       }}
-      class="h-5 w-5 rounded border-input bg-background"
     />
   </div>
 
   <!-- Spellcheck Toggle -->
   <div class="flex items-center justify-between">
     <div>
-      <label class="text-sm font-medium text-foreground">Spellcheck</label>
+      <Label>Spellcheck</Label>
       <p class="text-xs text-muted-foreground">
         Grammar and spelling suggestions while typing
       </p>
@@ -103,38 +121,38 @@
     />
   </div>
 
-  <!-- Disable Suggestions Toggle -->
+  <!-- Suggestions Toggle -->
   <div class="flex items-center justify-between">
     <div>
-      <label class="text-sm font-medium text-foreground">Disable Suggestions</label>
+      <Label>Suggestions</Label>
       <p class="text-xs text-muted-foreground">
-        Hide AI-generated action choices and plot suggestions
+        Show AI-generated action choices and plot suggestions
       </p>
     </div>
     <Switch
-      checked={settings.uiSettings.disableSuggestions}
-      onCheckedChange={(v) => settings.setDisableSuggestions(v)}
+      checked={!settings.uiSettings.disableSuggestions}
+      onCheckedChange={(v) => settings.setDisableSuggestions(!v)}
     />
   </div>
 
-  <!-- Disable Action Prefixes Toggle -->
+  <!-- Action Prefixes Toggle -->
   <div class="flex items-center justify-between">
     <div>
-      <label class="text-sm font-medium text-foreground">Disable Action Prefixes</label>
+      <Label>Action Prefixes</Label>
       <p class="text-xs text-muted-foreground">
-        Hide Do/Say/Think buttons and use raw input
+        Show Do/Say/Think buttons for input
       </p>
     </div>
     <Switch
-      checked={settings.uiSettings.disableActionPrefixes}
-      onCheckedChange={(v) => settings.setDisableActionPrefixes(v)}
+      checked={!settings.uiSettings.disableActionPrefixes}
+      onCheckedChange={(v) => settings.setDisableActionPrefixes(!v)}
     />
   </div>
 
   <!-- Show Reasoning Toggle -->
   <div class="flex items-center justify-between">
     <div>
-      <label class="text-sm font-medium text-foreground">Show Reasoning Block</label>
+      <Label>Reasoning Block</Label>
       <p class="text-xs text-muted-foreground">Show thought process display</p>
     </div>
     <Switch

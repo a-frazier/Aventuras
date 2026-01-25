@@ -36,6 +36,7 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import IconRow from "$lib/components/ui/icon-row.svelte";
   import X from "@lucide/svelte/icons/x";
+  import { isMobileDevice } from "$lib/utils/swipe";
 
   interface Props {
     providerOptions: ProviderInfo[];
@@ -319,8 +320,8 @@
           </div>
 
           <div class="space-y-2">
-            <Label for="new-key">API Key</Label>
             <Input
+              label="API Key"
               id="new-key"
               type="password"
               placeholder="sk-..."
@@ -330,7 +331,7 @@
           </div>
         </div>
 
-        <Separator />
+        <Separator class="my-4" />
 
         <div class="space-y-3">
           <div class="flex items-center justify-between">
@@ -338,20 +339,6 @@
               <Box class="h-4 w-4" />
               Models
             </Label>
-            <Button
-              variant="outline"
-              size="sm"
-              onclick={handleFetchModels}
-              disabled={isFetchingModels || !formBaseUrl}
-            >
-              {#if isFetchingModels}
-                <RefreshCw class=" h-3 w-3 animate-spin" />
-                Fetching...
-              {:else}
-                <RefreshCw class=" h-3 w-3" />
-                Fetch Models
-              {/if}
-            </Button>
           </div>
 
           {#if fetchError}
@@ -361,68 +348,86 @@
             </Alert>
           {/if}
 
-          {#if formFetchedModels.length > 0}
-            <div class="space-y-2">
-              <p class="text-xs font-medium text-muted-foreground">
-                Fetched Models ({formFetchedModels.length})
-              </p>
-              <ScrollArea class="h-32 w-full rounded-md border">
-                <div class="flex flex-wrap gap-1 p-2">
-                  {#each formFetchedModels as model}
-                    <Badge variant="secondary" class="gap-1 pr-1">
-                      <span class="max-w-37.5 truncate">{model}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-4 w-4 p-0 hover:text-destructive"
-                        onclick={() => handleRemoveFetchedModel(model)}
-                      >
-                        <X class="h-3 w-3" />
-                      </Button>
-                    </Badge>
-                  {/each}
-                </div>
-              </ScrollArea>
-            </div>
-          {/if}
-
-          <div class="space-y-2">
-            <p class="text-xs font-medium text-muted-foreground">
-              Custom Models
-            </p>
+          <div class="space-y-2 mb-2">
             <div class="flex gap-2">
               <Input
-                placeholder="model-name or provider/model"
+                placeholder={isMobileDevice()
+                  ? "Add custom or fetch..."
+                  : "Add custom model or fetch available"}
                 bind:value={formNewModelInput}
-                class="flex-1 pr-20"
+                class="flex-1 w-full"
                 onkeydown={(e) => e.key === "Enter" && handleAddCustomModel()}
               />
               <Button
-                size="icon"
+                variant="outline"
                 onclick={handleAddCustomModel}
                 disabled={!formNewModelInput.trim()}
               >
                 <Plus class="h-4 w-4" />
               </Button>
+              <Button
+                variant="outline"
+                onclick={handleFetchModels}
+                disabled={isFetchingModels || !formBaseUrl}
+              >
+                {#if isFetchingModels}
+                  <RefreshCw class=" h-4 w-4 animate-spin" />
+                  Fetching...
+                {:else}
+                  <RefreshCw class=" h-4 w-4" />
+                  {isMobileDevice() ? "" : "Fetch Models"}
+                {/if}
+              </Button>
             </div>
+
+            {#if formFetchedModels.length > 0}
+              <div class="space-y-2">
+                <p class="text-xs font-medium text-muted-foreground">
+                  Fetched Models ({formFetchedModels.length})
+                </p>
+                <ScrollArea class="h-32 w-full rounded-md border">
+                  <div class="flex flex-wrap gap-1 p-2">
+                    {#each formFetchedModels as model}
+                      <Badge variant="secondary" class="gap-1 pr-1">
+                        <span class="max-w-37.5 truncate">{model}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-4 w-4 p-0 hover:text-destructive"
+                          onclick={() => handleRemoveFetchedModel(model)}
+                        >
+                          <X class="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    {/each}
+                  </div>
+                </ScrollArea>
+              </div>
+            {/if}
+
             {#if formCustomModels.length > 0}
-              <ScrollArea class="h-24 w-full rounded-md border">
-                <div class="flex flex-wrap gap-1 p-2">
-                  {#each formCustomModels as model}
-                    <Badge variant="outline" class="gap-1 pr-1">
-                      <span class="max-w-37.5 truncate">{model}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-4 w-4 p-0 hover:text-destructive"
-                        onclick={() => handleRemoveCustomModel(model)}
-                      >
-                        <X class="h-3 w-3" />
-                      </Button>
-                    </Badge>
-                  {/each}
-                </div>
-              </ScrollArea>
+              <div class="space-y-2">
+                <p class="text-xs font-medium text-muted-foreground">
+                  Custom Models ({formCustomModels.length})
+                </p>
+                <ScrollArea class="h-24 w-full rounded-md border">
+                  <div class="flex flex-wrap gap-1 p-2">
+                    {#each formCustomModels as model}
+                      <Badge variant="outline" class="gap-1 pr-1">
+                        <span class="max-w-37.5 truncate">{model}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-4 w-4 p-0 hover:text-destructive"
+                          onclick={() => handleRemoveCustomModel(model)}
+                        >
+                          <X class="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    {/each}
+                  </div>
+                </ScrollArea>
+              </div>
             {/if}
           </div>
         </div>
@@ -610,7 +615,7 @@
                       Fetching...
                     {:else}
                       <RefreshCw class=" h-3 w-3" />
-                      Fetch Models
+                      {isMobileDevice() ? "HHelelo" : "Fetch Models"}
                     {/if}
                   </Button>
                 </div>
