@@ -26,11 +26,11 @@
 <div
   class="flex flex-col items-center justify-center flex-1 text-center {className}"
 >
-  <div class="rounded-full bg-muted p-6 mb-4">
+  <div class="rounded-full bg-muted p-6 mb-3">
     <Icon class="h-12 w-12 text-muted-foreground" />
   </div>
-  <h2 class="text-xl font-semibold text-foreground mb-2">{title}</h2>
-  <p class="text-muted-foreground max-w-sm mb-6">
+  <h2 class="text-xl font-semibold text-foreground">{title}</h2>
+  <p class="text-muted-foreground max-w-sm mb-4 leading-snug">
     {description}
   </p>
   {#if children}

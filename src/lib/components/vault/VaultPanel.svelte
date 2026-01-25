@@ -72,13 +72,6 @@
   let showDiscoveryModal = $state(false);
   let discoveryMode = $state<VaultType>("character");
 
-  // Error States
-  let errors = $state<Record<VaultTab, string | null>>({
-    characters: null,
-    lorebooks: null,
-    scenarios: null,
-  });
-
   // Configuration
   interface VaultSectionConfig {
     id: VaultTab;
@@ -215,38 +208,20 @@
     showCharForm = true;
   }
 
-  async function handleImportCard(event: Event) {
+  function handleImportCard(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-
-    try {
-      await characterVault.importFromFile(file);
-    } catch (error) {
-      console.error("[CharacterVault] Import failed:", error);
-      errors.characters =
-        error instanceof Error
-          ? error.message
-          : "Failed to import character card";
-    } finally {
-      input.value = "";
-    }
+    characterVault.importFromFile(file);
+    input.value = "";
   }
 
-  async function handleImportLorebook(event: Event) {
+  function handleImportLorebook(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-
-    try {
-      await lorebookVault.importFromFile(file);
-    } catch (error) {
-      console.error("[VaultPanel] Lorebook import failed:", error);
-      errors.lorebooks =
-        error instanceof Error ? error.message : "Failed to import lorebook";
-    } finally {
-      input.value = "";
-    }
+    lorebookVault.importFromFile(file);
+    input.value = "";
   }
 
   async function handleCreateLorebook() {
@@ -275,20 +250,12 @@
     editingLorebook = newLorebook;
   }
 
-  async function handleImportScenario(event: Event) {
+  function handleImportScenario(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-
-    try {
-      await scenarioVault.importFromFile(file);
-    } catch (error) {
-      console.error("[VaultPanel] Scenario import failed:", error);
-      errors.scenarios =
-        error instanceof Error ? error.message : "Failed to import scenario";
-    } finally {
-      input.value = "";
-    }
+    scenarioVault.importFromFile(file);
+    input.value = "";
   }
 
   function openBrowseOnline(mode: VaultType) {
@@ -412,26 +379,6 @@
   <div
     class="flex flex-col gap-3 bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60"
   >
-    <!-- Errors -->
-    {#each sections as section}
-      {#if activeTab === section.id && errors[section.id]}
-        <div
-          class="flex items-center justify-between rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          <span>{errors[section.id]}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-6 w-6 text-destructive hover:bg-destructive/20 hover:text-destructive"
-            onclick={() => (errors[section.id] = null)}
-          >
-            <span class="sr-only">Dismiss</span>
-            &times;
-          </Button>
-        </div>
-      {/if}
-    {/each}
-
     <div class="flex items-center gap-2">
       <Input
         type="text"

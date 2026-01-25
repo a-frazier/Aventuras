@@ -2,6 +2,7 @@ import type { VaultCharacter, Character } from '$lib/types';
 import { database } from '$lib/services/database';
 import { discoveryService, type DiscoveryCard } from '$lib/services/discovery';
 import { readCharacterCardFile, parseCharacterCard, sanitizeCharacterCard } from '$lib/services/characterCardImporter';
+import { ui } from './ui.svelte';
 
 const DEBUG = true;
 
@@ -240,25 +241,20 @@ class CharacterVaultStore {
 
     // 2. Process in background
     this._processDiscoveryImport(tempId, card).catch(err => {
-      console.error('[CharacterVault] Background import failed:', err);
+      const message = err instanceof Error ? err.message : `Failed to import ${card.name}`;
+      ui.showToast(message, 'error');
       this.characters = this.characters.filter(c => c.id !== tempId);
     });
   }
 
   private async _processDiscoveryImport(tempId: string, card: DiscoveryCard): Promise<void> {
-    try {
-      const blob = await discoveryService.downloadCard(card);
-      const file = new File([blob], `${card.name}.${blob.type.includes('json') ? 'json' : 'png'}`, { type: blob.type });
-      
-      await this._processFileImport(tempId, file, {
-        sourceUrl: card.imageUrl || card.avatarUrl,
-        tags: card.tags
-      });
-    } catch (error) {
-      console.error(`Import failed for ${card.name}`, error);
-      this.characters = this.characters.filter(c => c.id !== tempId);
-      throw error;
-    }
+    const blob = await discoveryService.downloadCard(card);
+    const file = new File([blob], `${card.name}.${blob.type.includes('json') ? 'json' : 'png'}`, { type: blob.type });
+    
+    await this._processFileImport(tempId, file, {
+      sourceUrl: card.imageUrl || card.avatarUrl,
+      tags: card.tags
+    });
   }
 
   /**
@@ -292,7 +288,8 @@ class CharacterVaultStore {
 
     // 2. Process in background
     this._processFileImport(tempId, file, {}).catch(err => {
-      console.error('[CharacterVault] File import failed:', err);
+      const message = err instanceof Error ? err.message : `Failed to import ${name}`;
+      ui.showToast(message, 'error');
       this.characters = this.characters.filter(c => c.id !== tempId);
     });
   }
@@ -359,6 +356,7 @@ class CharacterVaultStore {
       log('Completed import for:', finalData.name);
 
     } catch (error) {
+      this.characters = this.characters.filter(c => c.id !== tempId);
       throw error;
     }
   }

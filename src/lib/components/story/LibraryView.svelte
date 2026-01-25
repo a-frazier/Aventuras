@@ -45,8 +45,6 @@
     }
   }
 
-  let importError = $state<string | null>(null);
-
   function triggerImport() {
     importFileInput?.click();
   }
@@ -55,8 +53,6 @@
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-
-    importError = null;
 
     try {
       const content = await file.text();
@@ -67,13 +63,13 @@
         await story.loadStory(result.storyId);
         ui.setActivePanel("story");
       } else if (result.error) {
-        importError = result.error;
-        setTimeout(() => (importError = null), 5000);
+        ui.showToast(result.error, "error");
       }
     } catch (error) {
-      importError =
-        error instanceof Error ? error.message : "Failed to read file";
-      setTimeout(() => (importError = null), 5000);
+      ui.showToast(
+        error instanceof Error ? error.message : "Failed to read file",
+        "error",
+      );
     }
 
     // Reset file input for re-selection
@@ -89,12 +85,12 @@
     >
       <div class="flex-1 min-w-0 mr-2">
         <h1
-          class="text-xl sm:text-3xl font-bold tracking-tight text-foreground truncate"
+          class="pb-1 text-xl sm:text-3xl font-bold tracking-tight text-foreground truncate"
         >
           Story Library
         </h1>
-        <p class="text-sm sm:text-base text-muted-foreground truncate">
-          Your adventures await
+        <p class="-mt-1 text-sm sm:text-base text-muted-foreground truncate">
+          Your adventures await...
         </p>
       </div>
       <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -136,21 +132,12 @@
       </div>
     </div>
 
-    <!-- Import error message -->
-    {#if importError}
-      <div
-        class="mb-4 rounded-lg bg-destructive/15 p-3 text-sm text-destructive border border-destructive/20"
-      >
-        {importError}
-      </div>
-    {/if}
-
     <!-- Stories grid -->
     {#if story.allStories.length === 0}
       <EmptyState
         icon={BookOpen}
         title="No stories yet"
-        description="Create your first adventure to get started. You can also import existing stories."
+        description="Create your first adventure to get started."
         actionLabel="Create Story"
         onAction={openSetupWizard}
         class="pb-20"

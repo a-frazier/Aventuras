@@ -24,10 +24,9 @@
 
   interface Props {
     providerOptions: ProviderInfo[];
-    onManageProfiles: () => void;
   }
 
-  let { providerOptions, onManageProfiles }: Props = $props();
+  let { providerOptions }: Props = $props();
 
   const reasoningLevels = ["off", "low", "medium", "high"] as const;
   const reasoningLabels: Record<string, string> = {
@@ -484,7 +483,6 @@
           onModelChange={(m) => {
             if (tempPreset) tempPreset.model = m;
           }}
-          {onManageProfiles}
         />
 
         <div class="grid grid-cols-2 gap-4">
