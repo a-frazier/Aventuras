@@ -9,7 +9,7 @@
   import TimePanel from '$lib/components/world/TimePanel.svelte';
   import BranchPanel from '$lib/components/branch/BranchPanel.svelte';
   import { swipe } from '$lib/utils/swipe';
-  
+
   import * as Tabs from "$lib/components/ui/tabs";
   import { Button } from "$lib/components/ui/button";
 
@@ -43,21 +43,21 @@
 </script>
 
 <aside
-  class="flex h-full w-[calc(100vw-3rem)] max-w-72 flex-col border-l border-border bg-card/50 sm:w-72 backdrop-blur-[2px]"
+  class="flex h-full w-[calc(100vw-3rem)] max-w-72 flex-col border-l border-border bg-card/80 sm:w-72 backdrop-blur-[2px]"
   use:swipe={{ onSwipeLeft: handleSwipeLeft, onSwipeRight: handleSwipeRight, threshold: 50 }}
 >
   <!-- Tab navigation -->
-  <Tabs.Root 
-    value={ui.sidebarTab} 
-    onValueChange={(v) => ui.setSidebarTab(v as any)} 
-    class="flex flex-col h-full"
+  <Tabs.Root
+    value={ui.sidebarTab}
+    onValueChange={(v) => ui.setSidebarTab(v as any)}
+    class="flex flex-col flex-1 min-h-0"
   >
-    <div class="border-b border-border px-0">
+    <div class="border-b border-border px-0 flex-shrink-0 bg-muted/60">
         <Tabs.List class="w-full flex justify-start rounded-none bg-transparent p-0 h-auto">
         {#each tabs as tab}
-            <Tabs.Trigger 
-                value={tab.id} 
-                class="flex-1 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:bg-muted/50 transition-colors"
+            <Tabs.Trigger
+                value={tab.id}
+                class="flex-1 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-muted/30 bg-transparent hover:bg-muted/20 text-muted-foreground transition-colors"
                 title={tab.label}
             >
                 <svelte:component this={tab.icon} class="h-4 w-4" />
@@ -67,7 +67,7 @@
     </div>
 
     <!-- Panel content -->
-    <div class="flex-1 overflow-y-auto p-3">
+    <div class="flex-1 overflow-y-auto p-3 min-h-0">
         <Tabs.Content value="characters" class="mt-0 h-full space-y-4">
             <CharacterPanel />
         </Tabs.Content>
@@ -90,10 +90,10 @@
   </Tabs.Root>
 
   <!-- Bottom Context Navigation -->
-  <div class="flex items-center gap-1 border-t border-border p-2 bg-muted/20">
+  <div class="flex-shrink-0 flex items-center gap-1 border-t border-border p-2 bg-muted">
     <Button
-      variant={ui.activePanel === 'story' ? 'secondary' : 'ghost'}
-      class="flex-1 flex-col h-auto py-2 gap-1 text-xs"
+      variant="ghost"
+      class="flex-1 flex-col h-auto py-2 gap-1 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground {ui.activePanel === 'story' ? '!bg-primary/10 !text-primary' : ''}"
       onclick={() => ui.setActivePanel('story')}
       title="Story"
     >
@@ -101,8 +101,8 @@
       <span>Story</span>
     </Button>
     <Button
-      variant={ui.activePanel === 'lorebook' ? 'secondary' : 'ghost'}
-      class="flex-1 flex-col h-auto py-2 gap-1 text-xs"
+      variant="ghost"
+      class="flex-1 flex-col h-auto py-2 gap-1 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground {ui.activePanel === 'lorebook' ? '!bg-primary/10 !text-primary' : ''}"
       onclick={() => ui.setActivePanel('lorebook')}
       title="Lorebook"
     >
@@ -110,8 +110,8 @@
       <span>Lorebook</span>
     </Button>
     <Button
-      variant={ui.activePanel === 'memory' ? 'secondary' : 'ghost'}
-      class="flex-1 flex-col h-auto py-2 gap-1 text-xs"
+      variant="ghost"
+      class="flex-1 flex-col h-auto py-2 gap-1 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground {ui.activePanel === 'memory' ? '!bg-primary/10 !text-primary' : ''}"
       onclick={() => ui.setActivePanel('memory')}
       title="Memory"
     >

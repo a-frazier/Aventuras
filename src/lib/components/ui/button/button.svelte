@@ -12,15 +12,14 @@
 			variant: {
 				default:
 					"bg-primary text-primary-foreground hover:bg-primary/90",
-				destructive:
-					"text-foreground hover:text-destructive",
+				destructive: "text-foreground hover:text-destructive",
 				outline:
 					"border-input bg-background hover:bg-accent hover:text-accent-foreground border",
 				secondary:
 					"bg-secondary text-secondary-foreground hover:bg-secondary/80",
 				ghost: "hover:bg-accent hover:text-accent-foreground",
 				link: "text-primary underline-offset-4 hover:underline",
-				text: "text-foreground hover:text-accent",
+				text: "text-foreground hover:text-primary/80",
 			},
 			size: {
 				default: "h-10 px-4 py-2",
@@ -77,7 +76,9 @@
 	}: ButtonProps = $props();
 
 	// Determine if we are in "Responsive Mode" (Icon/Label provided)
-	let isResponsive = $derived(!!(Icon || label || mobileLabel || mobileVariant));
+	let isResponsive = $derived(
+		!!(Icon || label || mobileLabel || mobileVariant),
+	);
 
 	// If responsive mode and no class override, use ResponsiveButton default
 	// ResponsiveButton default: "h-10 w-10 sm:w-auto sm:h-10 sm:px-4"
@@ -98,7 +99,9 @@
 	let mobileIconClass = $derived(iconClass ?? "h-5 w-5");
 
 	// For Single Render optimization
-	let responsiveIconClass = $derived(iconClass ? iconClass : "h-5 w-5 sm:h-4 sm:w-4");
+	let responsiveIconClass = $derived(
+		iconClass ? iconClass : "h-5 w-5 sm:h-4 sm:w-4",
+	);
 </script>
 
 {#snippet ButtonContent(isMobile: boolean)}
@@ -115,11 +118,15 @@
 	{/if}
 {/snippet}
 
-{#snippet Element(targetVariant: ButtonVariant, extraClass: string, isMobile: boolean)}
+{#snippet Element(
+	targetVariant: ButtonVariant,
+	extraClass: string,
+	isMobile: boolean,
+)}
 	{@const finalClass = cn(
 		buttonVariants({ variant: targetVariant, size }),
 		extraClass,
-		effectiveClass
+		effectiveClass,
 	)}
 	{@const finalTitle = title ?? label}
 
@@ -164,10 +171,15 @@
 			{...restProps}
 		>
 			{#if Icon}<Icon class={responsiveIconClass} />{/if}
-			{#if mobileLabel}<span class="inline sm:hidden">{mobileLabel}</span>{/if}
+			{#if mobileLabel}<span class="inline sm:hidden">{mobileLabel}</span
+				>{/if}
 			{#if label}<span class="hidden sm:inline">{label}</span>{/if}
-			{#if children && !label}<span class="hidden sm:inline">{@render children()}</span>{/if}
-			{#if EndIcon}<EndIcon class="hidden sm:inline h-3 w-3 opacity-50" />{/if}
+			{#if children && !label}<span class="hidden sm:inline"
+					>{@render children()}</span
+				>{/if}
+			{#if EndIcon}<EndIcon
+					class="hidden sm:inline h-3 w-3 opacity-50"
+				/>{/if}
 		</a>
 	{:else}
 		<button
@@ -178,10 +190,15 @@
 			{...restProps}
 		>
 			{#if Icon}<Icon class={responsiveIconClass} />{/if}
-			{#if mobileLabel}<span class="inline sm:hidden">{mobileLabel}</span>{/if}
+			{#if mobileLabel}<span class="inline sm:hidden">{mobileLabel}</span
+				>{/if}
 			{#if label}<span class="hidden sm:inline">{label}</span>{/if}
-			{#if children && !label}<span class="hidden sm:inline">{@render children()}</span>{/if}
-			{#if EndIcon}<EndIcon class="hidden sm:inline h-3 w-3 opacity-50" />{/if}
+			{#if children && !label}<span class="hidden sm:inline"
+					>{@render children()}</span
+				>{/if}
+			{#if EndIcon}<EndIcon
+					class="hidden sm:inline h-3 w-3 opacity-50"
+				/>{/if}
 		</button>
 	{/if}
 {:else}

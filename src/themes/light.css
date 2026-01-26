@@ -5,9 +5,9 @@
 [data-theme="light"] {
   /* Paper-inspired surface colors */
   --color-surface-50: #faf9f7;
-  --color-surface-100: #f5f3f0;
-  --color-surface-200: #eceae5;
-  --color-surface-300: #dedad3;
+  --color-surface-100: #f4f2ee; /* Cleaner off-white */
+  --color-surface-200: #e8e6e1;
+  --color-surface-300: #dad8d3;
   --color-surface-400: #b8b3a9;
   --color-surface-500: #7d786e;
   --color-surface-600: #5c5850;

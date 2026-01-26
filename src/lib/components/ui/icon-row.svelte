@@ -24,47 +24,47 @@
   let confirming = $state(false);
 </script>
 
-<div class="flex items-center shrink-0 gap-4 sm:gap-2.5 {className}">
+<div class="flex items-center shrink-0 gap-1 {className}">
   {#if confirming}
     <span class="text-xs font-medium text-muted-foreground">
       {confirmMessage}
     </span>
-    <Button
-      variant="ghost"
-      {size}
-      class="hover:bg-transparent text-muted-foreground hover:text-foreground w-5"
-      onclick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        confirming = false;
-      }}
-      title="Cancel"
-    >
-      <X class="h-3.5 w-3.5" />
-    </Button>
-    <Button
-      variant="ghost"
-      {size}
-      class="hover:bg-transparent text-destructive w-5"
-      onclick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        confirming = false;
-        onDelete?.();
-      }}
-      title="Confirm Delete"
-    >
-      <Check class="h-3.5 w-3.5" />
-    </Button>
-  {:else}
-    {#if children}
-      {@render children()}
-    {/if}
-    {#if onDelete && showDelete}
       <Button
-        class="w-5"
-        variant="destructive"
+        variant="text"
         {size}
+        class="hover:bg-transparent text-muted-foreground hover:text-foreground h-6 w-5"
+        onclick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          confirming = false;
+        }}
+        title="Cancel"
+      >
+        <X class="h-3.5 w-3.5" />
+      </Button>
+      <Button
+        variant="text"
+        {size}
+        class="hover:bg-transparent text-destructive h-6 w-5"
+        onclick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          confirming = false;
+          onDelete?.();
+        }}
+        title="Confirm Delete"
+      >
+        <Check class="h-3.5 w-3.5" />
+      </Button>
+    {:else}
+      {#if children}
+        {@render children()}
+      {/if}
+      {#if onDelete && showDelete}
+        <Button
+          class="h-6 w-5"
+          variant="destructive"
+          {size}
         onclick={(e) => {
           e.preventDefault();
           e.stopPropagation();
