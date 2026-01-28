@@ -18,7 +18,7 @@
     Bookmark,
     Volume2,
   } from "lucide-svelte";
-  import { aiTTSService } from "$lib/services/ai/tts";
+  import { aiTTSService } from "$lib/services/ai/utils/TTSService";
   import { parseMarkdown } from "$lib/utils/markdown";
   import { slide } from "svelte/transition";
   import {
@@ -33,14 +33,21 @@
   import {
     eventBus,
     type ImageReadyEvent,
+    type ImageAnalysisFailedEvent,
     type TTSQueuedEvent,
   } from "$lib/services/events";
-  import { NanoGPTImageProvider } from "$lib/services/ai/nanoGPTImageProvider";
-  import { ChutesImageProvider } from "$lib/services/ai/chutesImageProvider";
+  import { NanoGPTImageProvider } from "$lib/services/ai/image/providers/NanoGPTProvider";
+  import { ChutesImageProvider } from "$lib/services/ai/image/providers/ChutesProvider";
+  import { ImageGenerationService } from "$lib/services/ai/image/ImageGenerationService";
+  import { inlineImageService } from "$lib/services/ai/image/InlineImageService";
   import { promptService } from "$lib/services/prompts";
   import { onMount } from "svelte";
   import ReasoningBlock from "./ReasoningBlock.svelte";
   import { countTokens } from "$lib/services/tokenizer";
+  import { Button } from "$lib/components/ui/button";
+  import { Textarea } from "$lib/components/ui/textarea";
+  import { Input } from "$lib/components/ui/input";
+  import { IMAGE_STUCK_THRESHOLD_MS, DEFAULT_FALLBACK_STYLE_PROMPT } from "$lib/services/ai/image/constants";
 
   let { entry }: { entry: StoryEntry } = $props();
 
@@ -52,8 +59,7 @@
 
   // Check if reasoning is enabled in API settings
   const isReasoningEnabled = $derived(
-    settings.apiSettings.reasoningEffort !== "off" &&
-      settings.apiSettings.enableThinking,
+    settings.apiSettings.reasoningEffort !== "off",
   );
 
   // TTS generation state
@@ -176,6 +182,16 @@
   let isEditingImage = $state(false);
   let editingImageId = $state<string | null>(null);
   let editingImagePrompt = $state("");
+
+  // Timer for checking stuck images
+  let now = $state(Date.now());
+
+  onMount(() => {
+    const interval = setInterval(() => {
+      now = Date.now();
+    }, 1000);
+    return () => clearInterval(interval);
+  });
 
   // Helper to get which branch a checkpoint belongs to (by checking its last entry's branchId)
   function getCheckpointBranchId(checkpoint: {
@@ -473,8 +489,25 @@
     return sanitizeVisualProse(processedContent, entryId);
   }
 
+  // Handle creating missing inline images (stuck/lost records)
+  async function handleCreateMissingImage() {
+    if (!story.currentStory) return;
+
+    // Trigger scanning of this entry
+    // We pass the full content, the service will find tags and create missing records
+    const context = {
+      storyId: story.currentStory.id,
+      entryId: entry.id,
+      narrativeContent: entry.translatedContent ?? entry.content,
+      presentCharacters: story.characters, // Use all story characters for lookup
+    };
+
+    await inlineImageService.processNarrativeForInlineImages(context);
+    await loadEmbeddedImages();
+  }
+
   // Handle click on embedded image link
-  function handleContentClick(event: MouseEvent) {
+  function handleContentClick(event: MouseEvent | KeyboardEvent) {
     const target = event.target as HTMLElement;
 
     // Check for inline image action buttons
@@ -484,6 +517,12 @@
       event.stopPropagation();
       const action = actionBtn.getAttribute("data-action");
       const imageId = actionBtn.getAttribute("data-image-id");
+      const prompt = actionBtn.getAttribute("data-prompt");
+
+      if (action === "create-missing" && prompt) {
+        handleCreateMissingImage();
+        return;
+      }
 
       if (action && imageId) {
         handleInlineImageAction(action, imageId);
@@ -533,63 +572,50 @@
     const image = embeddedImages.find((img) => img.id === imageId);
     if (!image) return;
 
-    try {
-      // Update status to generating
-      await database.updateEmbeddedImage(imageId, {
-        status: "generating",
-        errorMessage: undefined,
-      });
+    let finalPrompt = prompt;
 
-      // Reload images to show generating state
-      await loadEmbeddedImages();
+    // If it's an inline image, try to reconstruct prompt with CURRENT style
+    // This allows style changes in settings to apply when retrying/regenerating
+    if (
+      image.generationMode === "inline" &&
+      image.sourceText &&
+      image.sourceText.startsWith("<pic")
+    ) {
+      // Extract raw prompt from sourceText
+      const match = image.sourceText.match(/prompt=["']([^"']+)["']/i);
+      if (match && match[1]) {
+        const rawPrompt = match[1];
 
-      // Get image settings
-      const imageSettings = settings.systemServicesSettings.imageGeneration;
-      const apiKey =
-        imageSettings.imageProvider === "chutes"
-          ? imageSettings.chutesApiKey
-          : imageSettings.nanoGptApiKey;
+        // Get CURRENT style
+        const imageSettings = settings.systemServicesSettings.imageGeneration;
+        const styleId = imageSettings.styleId;
+        let stylePrompt = "";
+        try {
+          const promptContext = {
+            mode: "adventure" as const,
+            pov: "second" as const,
+            tense: "present" as const,
+            protagonistName: "",
+          };
+          stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
+        } catch {
+          stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
+        }
 
-      if (!apiKey) {
-        throw new Error("No API key configured");
+        // Reconstruct full prompt
+        finalPrompt = `${rawPrompt}. ${stylePrompt}`;
+        console.log(
+          "[StoryEntry] Reconstructed prompt with new style:",
+          finalPrompt,
+        );
       }
-
-      // Create provider
-      const provider =
-        imageSettings.imageProvider === "chutes"
-          ? new ChutesImageProvider(apiKey, false)
-          : new NanoGPTImageProvider(apiKey, false);
-
-      // Generate new image
-      const response = await provider.generateImage({
-        prompt,
-        model: image.model || imageSettings.model,
-        size: imageSettings.size,
-        response_format: "b64_json",
-      });
-
-      if (response.images.length === 0 || !response.images[0].b64_json) {
-        throw new Error("No image data returned");
-      }
-
-      // Update with new image data
-      await database.updateEmbeddedImage(imageId, {
-        imageData: response.images[0].b64_json,
-        prompt,
-        status: "complete",
-      });
-
-      // Reload to show new image
-      await loadEmbeddedImages();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Regeneration failed";
-      await database.updateEmbeddedImage(imageId, {
-        status: "failed",
-        errorMessage,
-      });
-      await loadEmbeddedImages();
     }
+
+    // Use centralized retry logic from ImageGenerationService
+    await ImageGenerationService.retryImageGeneration(imageId, finalPrompt);
+
+    // Reload images to show updated state
+    await loadEmbeddedImages();
   }
 
   // Handle edit modal submission
@@ -612,7 +638,7 @@
       };
       stylePrompt = promptService.getPrompt(styleId, promptContext) || "";
     } catch {
-      stylePrompt = "Soft cel-shaded anime illustration.";
+      stylePrompt = DEFAULT_FALLBACK_STYLE_PROMPT;
     }
 
     const fullPrompt = `${editingImagePrompt.trim()}. ${stylePrompt}`;
@@ -657,11 +683,26 @@
     if (expandedImage.status === "complete" && expandedImage.imageData) {
       innerHtml += `<img src="data:image/png;base64,${expandedImage.imageData}" alt="${expandedImage.sourceText}" class="inline-image-content" />`;
     } else if (expandedImage.status === "generating") {
-      innerHtml += `<div class="inline-image-loading"><span class="spinner"></span><span>Generating image...</span></div>`;
+      const isStuck = now - expandedImage.createdAt > IMAGE_STUCK_THRESHOLD_MS;
+      innerHtml += `<div class="inline-image-placeholder generating">
+        <div class="placeholder-spinner"></div>
+        <span class="placeholder-status">Generating...</span>
+        ${isStuck ? `<button class="inline-image-retry" data-image-id="${expandedImage.id}">Force Retry</button>` : ''}
+      </div>`;
     } else if (expandedImage.status === "pending") {
-      innerHtml += `<div class="inline-image-loading"><span>Image queued...</span></div>`;
+      const isStuck = now - expandedImage.createdAt > IMAGE_STUCK_THRESHOLD_MS;
+      innerHtml += `<div class="inline-image-placeholder pending">
+        <div class="placeholder-icon">⏳</div>
+        <span class="placeholder-status">Queued...</span>
+        ${isStuck ? `<button class="inline-image-retry" data-image-id="${expandedImage.id}">Force Retry</button>` : ''}
+      </div>`;
     } else if (expandedImage.status === "failed") {
-      innerHtml += `<div class="inline-image-error"><span>Failed to generate image</span>${expandedImage.errorMessage ? `<span class="error-message">${expandedImage.errorMessage}</span>` : ""}</div>`;
+      innerHtml += `<div class="inline-image-placeholder failed">
+        <div class="placeholder-icon">⚠️</div>
+        <span class="placeholder-status">Generation Failed</span>
+        ${expandedImage.errorMessage ? `<span class="placeholder-text">${expandedImage.errorMessage}</span>` : ""}
+        <button class="inline-image-retry" data-image-id="${expandedImage.id}">Retry Generation</button>
+      </div>`;
     }
 
     container.innerHTML = innerHtml;
@@ -672,6 +713,19 @@
       closeBtn.addEventListener("click", () => {
         expandedImageId = null;
         clickedElement = null;
+      });
+    }
+    // Add retry button handler
+    const retryBtn = container.querySelector(".inline-image-retry");
+    if (retryBtn) {
+      retryBtn.addEventListener("click", async () => {
+        const imageId = retryBtn.getAttribute("data-image-id");
+        if (imageId && expandedImage) {
+          await regenerateInlineImage(imageId, expandedImage.prompt);
+          // The image will reload via the ImageReady subscription or manual reload
+          expandedImageId = null;
+          clickedElement = null;
+        }
       });
     }
 
@@ -708,6 +762,21 @@
       },
     );
 
+    // Subscribe to ImageAnalysisFailed events to show error toast
+    const unsubImageAnalysisFailed =
+      eventBus.subscribe<ImageAnalysisFailedEvent>(
+        "ImageAnalysisFailed",
+        (event) => {
+          if (event.entryId === entry.id) {
+            ui.showToast(
+              `Image generation failed: ${event.error}`,
+              "error",
+              10000,
+            );
+          }
+        },
+      );
+
     // Subscribe to TTSQueued events to auto-play TTS when triggered from ActionInput
     const unsubTTSQueued = eventBus.subscribe<TTSQueuedEvent>(
       "TTSQueued",
@@ -730,6 +799,7 @@
 
     return () => {
       unsubImageReady();
+      unsubImageAnalysisFailed();
       unsubTTSQueued();
     };
   });
@@ -742,10 +812,10 @@
   };
 
   const styles = {
-    user_action: "border-l-accent-500 bg-accent-500/5",
-    narration: "border-l-surface-600 bg-surface-800/50",
-    system: "border-l-surface-500 bg-surface-800/30 italic text-surface-400",
-    retry: "border-l-amber-500 bg-amber-500/5",
+    user_action: "border-l-primary bg-primary/5",
+    narration: "border-l-muted-foreground/40 bg-card",
+    system: "border-l-muted bg-muted/30 italic text-muted-foreground",
+    retry: "border-l-amber-500 bg-amber-500/10",
   };
 
   const Icon = $derived(icons[entry.type]);
@@ -904,19 +974,25 @@
   });
 </script>
 
-<div class="group rounded-lg border-l-4 px-4 pb-4 pt-3 {styles[entry.type]}">
+<div
+  class="group rounded-lg border border-border border-l-4 px-4 pb-4 pt-3 shadow-sm {styles[
+    entry.type
+  ]}"
+>
   <!-- Header row: Label + metadata on left, action buttons on right -->
   <div class="flex items-center gap-2 mb-2">
     <!-- Left side: Entry type indicator + reasoning toggle -->
     {#if entry.type === "user_action"}
-      <span class="user-action text-sm font-semibold tracking-wide">You</span>
+      <span class="user-action text-sm font-semibold tracking-wide text-primary"
+        >You</span
+      >
     {:else if entry.type === "system"}
-      <div class="flex items-center gap-1.5 text-surface-400">
+      <div class="flex items-center gap-1.5 text-muted-foreground">
         <Icon class="h-4 w-4 shrink-0 translate-y-px" />
         <span class="text-xs font-medium uppercase tracking-wider">System</span>
       </div>
     {:else}
-      <Icon class="h-4 w-4 shrink-0 translate-y-px text-surface-500" />
+      <Icon class="h-4 w-4 shrink-0 translate-y-px text-muted-foreground" />
     {/if}
 
     <!-- Reasoning toggle (inline icon in header) - only show if reasoning is enabled -->
@@ -930,15 +1006,13 @@
     {/if}
 
     <!-- Token count badge (shows 0 if no tokens) -->
-    <span
-      class="text-[11px] bg-surface-700/50 px-1.5 py-0.5 rounded tabular-nums"
-    >
+    <span class="text-[11px] bg-muted px-1.5 py-0.5 rounded tabular-nums">
       {#if isReasoningEnabled && reasoningTokens > 0}
-        <span class="text-surface-500">{reasoningTokens}r</span>
-        <span class="text-surface-600 mx-0.5">+</span>
+        <span class="text-muted-foreground">{reasoningTokens}r</span>
+        <span class="text-muted-foreground/50 mx-0.5">+</span>
       {/if}
-      <span class="text-surface-500">{contentTokens}</span>
-      <span class="text-surface-500 ml-0.5">tokens</span>
+      <span class="text-muted-foreground">{contentTokens}</span>
+      <span class="text-muted-foreground ml-0.5">tokens</span>
     </span>
 
     <!-- Spacer to push buttons to the right -->
@@ -946,66 +1020,76 @@
 
     <!-- Right side: Action buttons toolbar (always visible on mobile, hover-only on desktop) -->
     {#if !isEditing && !isDeleting && !isBranching && !isCreatingCheckpoint && entry.type !== "system"}
-      <div
-        class="flex items-center gap-0.5 visible sm:invisible sm:group-hover:visible sm:focus-within:visible transition-[visibility] duration-0"
-      >
+      <div class="flex items-center gap-0.5">
         {#if canRetry}
-          <button
+          <Button
+            variant="text"
+            size="icon"
             onclick={() => ui.triggerRetryLastMessage()}
-            class="entry-action-btn text-accent-400 hover:bg-accent-500/15"
+            class="h-7 w-7 text-amber-500 hover:text-amber-600"
             title="Generate a different response"
           >
             <RotateCcw class="h-4 w-4" />
-          </button>
+          </Button>
         {/if}
         {#if canBranch}
-          <button
+          <Button
+            variant="text"
+            size="icon"
             onclick={() => (isBranching = true)}
-            class="entry-action-btn text-amber-400 hover:bg-amber-500/15"
+            class="h-7 w-7 text-amber-500 hover:text-amber-600"
             title="Branch from here"
           >
             <GitBranch class="h-4 w-4" />
-          </button>
+          </Button>
         {/if}
         {#if canCreateCheckpoint}
-          <button
+          <Button
+            variant="text"
+            size="icon"
             onclick={() => (isCreatingCheckpoint = true)}
-            class="entry-action-btn text-blue-400 hover:bg-blue-500/15"
+            class="h-7 w-7 text-blue-500 hover:text-blue-600"
             title="Create checkpoint"
           >
             <Bookmark class="h-4 w-4" />
-          </button>
+          </Button>
         {/if}
-        <button
+        <Button
+          variant="text"
+          size="icon"
           onclick={handleTTSToggle}
           disabled={isGeneratingTTS}
-          class="entry-action-btn text-surface-400 hover:bg-surface-600 hover:text-surface-200 disabled:opacity-40"
+          class="h-7 w-7 text-muted-foreground hover:text-foreground"
           title={isPlayingTTS ? "Stop narration" : "Narrate"}
         >
           {#if isGeneratingTTS}
             <Loader2 class="h-4 w-4 animate-spin" />
           {:else if isPlayingTTS}
-            <X class="h-4 w-4 text-red-400" />
+            <X class="h-4 w-4 text-red-500" />
           {:else}
             <Volume2 class="h-4 w-4" />
           {/if}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="text"
+          size="icon"
           onclick={startEdit}
           disabled={ui.isGenerating}
-          class="entry-action-btn text-surface-400 hover:bg-surface-600 hover:text-surface-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="h-7 w-7 text-muted-foreground hover:text-foreground"
           title={ui.isGenerating ? "Cannot edit during generation" : "Edit"}
         >
           <Pencil class="h-4 w-4" />
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="text"
+          size="icon"
           onclick={() => (isDeleting = true)}
           disabled={ui.isGenerating}
-          class="entry-action-btn text-surface-400 hover:bg-red-500/15 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="h-7 w-7 text-muted-foreground hover:text-red-500"
           title={ui.isGenerating ? "Cannot delete during generation" : "Delete"}
         >
           <Trash2 class="h-4 w-4" />
-        </button>
+        </Button>
       </div>
     {/if}
   </div>
@@ -1014,58 +1098,63 @@
   <div class="min-w-0">
     {#if isEditing}
       <div class="space-y-2">
-        <textarea
+        <Textarea
           bind:value={editContent}
           onkeydown={handleKeydown}
-          class="input min-h-[100px] w-full resize-y text-base"
-          rows="4"
-        ></textarea>
+          class="min-h-25 w-full resize-y text-base"
+          rows={4}
+        />
         <div class="flex gap-2">
-          <button
-            onclick={saveEdit}
-            class="btn btn-primary flex items-center gap-1.5 text-sm min-h-[40px] px-3"
-          >
-            <Check class="h-4 w-4" />
+          <Button size="sm" onclick={saveEdit} class="h-9 px-3">
+            <Check class="mr-1.5 h-4 w-4" />
             Save
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onclick={cancelEdit}
-            class="btn btn-secondary flex items-center gap-1.5 text-sm min-h-[40px] px-3"
+            class="h-9 px-3"
           >
-            <X class="h-4 w-4" />
+            <X class="mr-1.5 h-4 w-4" />
             Cancel
-          </button>
+          </Button>
         </div>
-        <p class="text-xs text-surface-500 hidden sm:block">
+        <p class="text-xs text-muted-foreground hidden sm:block">
           Ctrl+Enter to save, Esc to cancel
         </p>
       </div>
     {:else if isDeleting}
       <div class="space-y-2">
-        <p class="text-sm text-surface-300">Delete this entry?</p>
+        <p class="text-sm text-muted-foreground">Delete this entry?</p>
         <div class="flex gap-2">
-          <button
+          <Button
+            variant="destructive"
+            size="sm"
             onclick={confirmDelete}
-            class="btn flex items-center gap-1.5 text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 min-h-[40px] px-3"
+            class="h-9 px-3"
           >
-            <Trash2 class="h-4 w-4" />
+            <Trash2 class="mr-1.5 h-4 w-4" />
             Delete
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onclick={() => (isDeleting = false)}
-            class="btn btn-secondary flex items-center gap-1.5 text-sm min-h-[40px] px-3"
+            class="h-9 px-3"
           >
-            <X class="h-4 w-4" />
+            <X class="mr-1.5 h-4 w-4" />
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     {:else if isBranching}
       <div class="space-y-2">
-        <p class="text-sm text-surface-300">Create a branch from this point:</p>
-        <input
+        <p class="text-sm text-muted-foreground">
+          Create a branch from this point:
+        </p>
+        <Input
           type="text"
-          class="input w-full text-sm"
+          class="h-9 text-sm"
           placeholder="Branch name..."
           bind:value={branchName}
           onkeydown={(e) => {
@@ -1074,34 +1163,37 @@
           }}
         />
         <div class="flex gap-2">
-          <button
+          <Button
+            size="sm"
             onclick={handleCreateBranch}
             disabled={!branchName.trim()}
-            class="btn flex items-center gap-1.5 text-sm bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 disabled:opacity-50 min-h-[40px] px-3"
+            class="h-9 px-3 bg-amber-500 hover:bg-amber-600 text-white"
           >
-            <GitBranch class="h-4 w-4" />
+            <GitBranch class="mr-1.5 h-4 w-4" />
             Create Branch
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onclick={cancelBranch}
-            class="btn btn-secondary flex items-center gap-1.5 text-sm min-h-[40px] px-3"
+            class="h-9 px-3"
           >
-            <X class="h-4 w-4" />
+            <X class="mr-1.5 h-4 w-4" />
             Cancel
-          </button>
+          </Button>
         </div>
-        <p class="text-xs text-surface-500">
+        <p class="text-xs text-muted-foreground">
           This will create a new timeline from this checkpoint.
         </p>
       </div>
     {:else if isCreatingCheckpoint}
       <div class="space-y-2">
-        <p class="text-sm text-surface-300">
+        <p class="text-sm text-muted-foreground">
           Create a checkpoint at this point:
         </p>
-        <input
+        <Input
           type="text"
-          class="input w-full text-sm"
+          class="h-9 text-sm"
           placeholder="Checkpoint name..."
           bind:value={checkpointName}
           onkeydown={(e) => {
@@ -1110,23 +1202,26 @@
           }}
         />
         <div class="flex gap-2">
-          <button
+          <Button
+            size="sm"
             onclick={handleCreateCheckpoint}
             disabled={!checkpointName.trim()}
-            class="btn flex items-center gap-1.5 text-sm bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 min-h-[40px] px-3"
+            class="h-9 px-3 bg-blue-500 hover:bg-blue-600 text-white"
           >
-            <Bookmark class="h-4 w-4" />
+            <Bookmark class="mr-1.5 h-4 w-4" />
             Create Checkpoint
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onclick={cancelCheckpoint}
-            class="btn btn-secondary flex items-center gap-1.5 text-sm min-h-[40px] px-3"
+            class="h-9 px-3"
           >
-            <X class="h-4 w-4" />
+            <X class="mr-1.5 h-4 w-4" />
             Cancel
-          </button>
+          </Button>
         </div>
-        <p class="text-xs text-surface-500">
+        <p class="text-xs text-muted-foreground">
           Checkpoints save the current story state and allow branching from this
           point.
         </p>
@@ -1142,12 +1237,17 @@
         />
       {/if}
 
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
       <div
         class="story-text prose-content"
         class:visual-prose-container={visualProseMode &&
           entry.type === "narration"}
         onclick={handleContentClick}
+        onkeydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") handleContentClick(e);
+        }}
+        tabindex="0"
+        role="button"
+        aria-label="Expand embedded image or interact with story content"
       >
         {#if entry.type === "narration"}
           {@const displayContent = entry.translatedContent ?? entry.content}
@@ -1184,14 +1284,16 @@
       </div>
 
       {#if isErrorEntry}
-        <button
+        <Button
+          variant="text"
+          size="sm"
           onclick={handleRetryFromEntry}
           disabled={ui.isGenerating}
-          class="mt-3 btn flex items-center gap-1.5 text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+          class="mt-1 h-8 p-0 text-red-500 hover:text-red-400"
         >
-          <RefreshCw class="h-4 w-4" />
+          <RefreshCw class="h-3.5 w-3.5" />
           Retry
-        </button>
+        </Button>
       {/if}
     {/if}
   </div>
@@ -1199,9 +1301,19 @@
 
 {#if isEditingImage}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="inline-image-edit-overlay" onclick={handleEditImageCancel}>
+  <div
+    class="inline-image-edit-overlay"
+    onclick={handleEditImageCancel}
+    role="presentation"
+  >
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="inline-image-edit-modal" onclick={(e) => e.stopPropagation()}>
+    <div
+      class="inline-image-edit-modal"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="0"
+    >
       <h3>Edit Image Prompt</h3>
       <textarea
         bind:value={editingImagePrompt}
@@ -1343,40 +1455,175 @@
     margin: 0 auto;
   }
 
-  :global(.inline-image-loading) {
+  /* Inline Image Placeholders (Loading/Pending/Failed) */
+  :global(.inline-image-placeholder) {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     padding: 2rem;
+    margin: 1rem 0;
+    border-radius: 0.75rem;
+    background-color: var(--surface-800);
+    border: 2px dashed var(--surface-600);
     color: var(--surface-400);
-    font-size: 0.875rem;
+    text-align: center;
+    min-height: 150px;
+    transition: all 0.2s ease;
   }
 
-  :global(.inline-image-loading .spinner) {
-    width: 1.5rem;
-    height: 1.5rem;
-    border: 2px solid var(--surface-600);
-    border-top-color: var(--accent-400);
+  :global(.inline-image-placeholder.generating) {
+    border-color: var(--accent-500);
+    background-color: var(--surface-850);
+  }
+
+  :global(.inline-image-placeholder.failed) {
+    border-color: var(--color-red-500, #ef4444);
+    border-style: solid;
+  }
+
+  :global(.placeholder-spinner) {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid var(--surface-700);
+    border-top-color: var(--accent-500);
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    margin-bottom: 0.5rem;
   }
 
-  :global(.inline-image-error) {
+  :global(.placeholder-icon) {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  :global(.placeholder-text) {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--surface-200);
+    max-width: 80%;
+    margin-top: 0.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  :global(.placeholder-status) {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--surface-400);
+  }
+
+  :global(.generating .placeholder-status) {
+    color: var(--accent-400);
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  :global(.failed .placeholder-status) {
+    color: var(--color-red-400, #f87171);
+  }
+
+  :global(.inline-image-retry) {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--accent-600);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  :global(.inline-image-retry:hover) {
+    background-color: var(--accent-500);
+  }
+
+  :global(.inline-image-stuck-notice) {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     gap: 0.5rem;
-    padding: 2rem;
-    color: var(--color-red-400, #f87171);
+    padding: 1rem;
+    background-color: var(--surface-700);
+    border-top: 1px solid var(--surface-600);
     font-size: 0.875rem;
+    color: var(--surface-300);
   }
 
-  :global(.inline-image-error .error-message) {
+  /* Inline Image Actions (Overlay) */
+  :global(.inline-generated-image) {
+    position: relative;
+    display: block; /* Change to block for better layout in prose */
+    margin: 1rem 0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  :global(.inline-image-actions) {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+  }
+
+  :global(.inline-generated-image:hover .inline-image-actions) {
+    opacity: 1;
+  }
+
+  /* Shared Inline Image Button Styles */
+  :global(.inline-image-btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.375rem;
     font-size: 0.75rem;
-    color: var(--surface-500);
+    font-weight: 500;
+    line-height: 1;
+    color: white; /* Always white for visibility on images */
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+
+  :global(.inline-image-btn:hover) {
+    background-color: rgba(0, 0, 0, 0.8);
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  :global(.inline-image-btn:active) {
+    transform: translateY(0);
+  }
+
+  :global(.inline-image-btn svg) {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Placeholder (Failed/Loading) styles for the button */
+  :global(.inline-image-placeholder .inline-image-btn) {
+    margin-top: 0.5rem;
+    color: var(--foreground);
+    background-color: var(--surface-600);
+    border-color: var(--surface-500);
+  }
+
+  :global(.inline-image-placeholder .inline-image-btn:hover) {
+    background-color: var(--surface-500);
+    border-color: var(--surface-400);
   }
 
   @keyframes spin {

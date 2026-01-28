@@ -1,0 +1,470 @@
+<script lang="ts">
+  import { settings } from "$lib/stores/settings.svelte";
+  import { Switch } from "$lib/components/ui/switch";
+  import { Label } from "$lib/components/ui/label";
+  import { Input } from "$lib/components/ui/input";
+  import { Button } from "$lib/components/ui/button";
+  import * as Select from "$lib/components/ui/select";
+  import { Slider } from "$lib/components/ui/slider";
+  import { RotateCcw } from "lucide-svelte";
+  import { ImageGenerationService } from "$lib/services/ai/image/ImageGenerationService";
+  import type { ImageModelInfo } from "$lib/services/ai/image/providers/base";
+  import ImageModelSelect from "$lib/components/settings/ImageModelSelect.svelte";
+  import { POLLINATIONS_DEFAULT_MODEL_ID, POLLINATIONS_REFERENCE_MODEL_ID } from "$lib/services/ai/image/constants";
+
+  const imageProviders = [
+    { value: "nanogpt", label: "NanoGPT" },
+    { value: "chutes", label: "Chutes" },
+    { value: "pollinations", label: "Pollinations.ai" },
+  ] as const;
+
+  const imageStyles = [
+    { value: "image-style-soft-anime", label: "Soft Anime" },
+    { value: "image-style-semi-realistic", label: "Semi-realistic Anime" },
+    { value: "image-style-photorealistic", label: "Photorealistic" },
+  ] as const;
+
+  const imageSizes = [
+    { value: "512x512", label: "512x512 (Faster)" },
+    { value: "1024x1024", label: "1024x1024 (Higher Quality)" },
+    { value: "2048x2048", label: "2048x2048 (Highest Quality)" },
+  ] as const;
+
+  // Pollinations models state
+  let pollinationsModels = $state<ImageModelInfo[]>([]);
+  let isLoadingPollinationsModels = $state(false);
+  let pollinationsModelsError = $state<string | null>(null);
+
+  // Filtered models (only image models, exclude video)
+  const filteredPollinationsModels = $derived(
+    pollinationsModels.filter(
+      (m) => !m.outputModalities || m.outputModalities.includes("image"),
+    ),
+  );
+
+  // Img2img models
+  const pollinationsImg2ImgModels = $derived(
+    filteredPollinationsModels.filter((m) => m.supportsImg2Img),
+  );
+
+  async function loadPollinationsModels() {
+    const apiKey =
+      settings.systemServicesSettings.imageGeneration.pollinationsApiKey;
+    isLoadingPollinationsModels = true;
+    pollinationsModelsError = null;
+
+    try {
+      // Use service to list models
+      pollinationsModels = await ImageGenerationService.listModels(
+        "pollinations",
+        apiKey,
+      );
+    } catch (error) {
+      pollinationsModelsError =
+        error instanceof Error ? error.message : "Failed to load models";
+    } finally {
+      isLoadingPollinationsModels = false;
+    }
+  }
+
+  // Auto-load/validate when Pollinations selected or API key changes
+  $effect(() => {
+    const isPollinations =
+      settings.systemServicesSettings.imageGeneration.imageProvider ===
+      "pollinations";
+    const apiKey =
+      settings.systemServicesSettings.imageGeneration.pollinationsApiKey;
+
+    if (isPollinations) {
+      loadPollinationsModels();
+    }
+  });
+
+  // Validate selected model exists (only if models are loaded)
+  $effect(() => {
+    if (
+      settings.systemServicesSettings.imageGeneration.imageProvider !==
+        "pollinations" ||
+      filteredPollinationsModels.length === 0
+    )
+      return;
+
+    const currentModel = settings.systemServicesSettings.imageGeneration.model;
+    const modelExists = filteredPollinationsModels.some(
+      (m) => m.id === currentModel,
+    );
+
+    if (!modelExists && !isLoadingPollinationsModels) {
+      const zimageModel = filteredPollinationsModels.find(
+        (m) => m.id === POLLINATIONS_DEFAULT_MODEL_ID,
+      );
+      settings.systemServicesSettings.imageGeneration.model = zimageModel
+        ? POLLINATIONS_DEFAULT_MODEL_ID
+        : filteredPollinationsModels[0].id;
+      settings.saveSystemServicesSettings();
+    }
+  });
+</script>
+
+<div class="space-y-4">
+  <!-- Image Provider Selection -->
+  <div>
+    <Label class="mb-2 block">Image Provider</Label>
+    <Select.Root
+      type="single"
+      value={settings.systemServicesSettings.imageGeneration.imageProvider ??
+        "nanogpt"}
+      onValueChange={(v) => {
+        const provider = v as "nanogpt" | "chutes" | "pollinations";
+        settings.systemServicesSettings.imageGeneration.imageProvider =
+          provider;
+        if (provider === "chutes") {
+          settings.systemServicesSettings.imageGeneration.referenceModel =
+            "qwen-image-edit-2511";
+        } else if (provider === "pollinations") {
+          settings.systemServicesSettings.imageGeneration.referenceModel =
+            POLLINATIONS_REFERENCE_MODEL_ID;
+          settings.systemServicesSettings.imageGeneration.model = POLLINATIONS_DEFAULT_MODEL_ID;
+        } else {
+          settings.systemServicesSettings.imageGeneration.referenceModel =
+            "qwen-image";
+        }
+        settings.saveSystemServicesSettings();
+      }}
+    >
+      <Select.Trigger class="h-10 w-full">
+        {imageProviders.find(
+          (p) =>
+            p.value ===
+            settings.systemServicesSettings.imageGeneration.imageProvider,
+        )?.label ?? "Select provider"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each imageProviders as provider}
+          <Select.Item value={provider.value} label={provider.label}>
+            {provider.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    <p class="mt-1 text-xs text-muted-foreground">
+      Configure your image generation service. Enable image generation for
+      specific stories in the Writing Style settings.
+    </p>
+  </div>
+
+  <!-- NanoGPT API Key -->
+  {#if (settings.systemServicesSettings.imageGeneration.imageProvider ?? "nanogpt") === "nanogpt"}
+    <div>
+      <Label class="mb-2 block">NanoGPT API Key</Label>
+      <div class="flex gap-2">
+        <Input
+          type="password"
+          class="flex-1"
+          value={settings.systemServicesSettings.imageGeneration.nanoGptApiKey}
+          oninput={(e) => {
+            settings.systemServicesSettings.imageGeneration.nanoGptApiKey =
+              e.currentTarget.value;
+            settings.saveSystemServicesSettings();
+          }}
+          placeholder="Enter your NanoGPT API key"
+        />
+        {#if settings.apiSettings.profiles.some((p) => p.baseUrl?.includes("nano-gpt.com") && p.apiKey)}
+          <Button
+            variant="outline"
+            onclick={() => {
+              const nanoProfile = settings.apiSettings.profiles.find(
+                (p) => p.baseUrl?.includes("nano-gpt.com") && p.apiKey,
+              );
+              if (nanoProfile?.apiKey) {
+                settings.systemServicesSettings.imageGeneration.nanoGptApiKey =
+                  nanoProfile.apiKey;
+                settings.saveSystemServicesSettings();
+              }
+            }}
+          >
+            Autofill
+          </Button>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Chutes API Key -->
+  {#if settings.systemServicesSettings.imageGeneration.imageProvider === "chutes"}
+    <div>
+      <Label class="mb-2 block">Chutes API Key</Label>
+      <Input
+        type="password"
+        class="w-full"
+        value={settings.systemServicesSettings.imageGeneration.chutesApiKey}
+        oninput={(e) => {
+          settings.systemServicesSettings.imageGeneration.chutesApiKey =
+            e.currentTarget.value;
+          settings.saveSystemServicesSettings();
+        }}
+        placeholder="Enter your Chutes API key"
+      />
+    </div>
+  {/if}
+
+  <!-- Pollinations API Key -->
+  {#if settings.systemServicesSettings.imageGeneration.imageProvider === "pollinations"}
+    <div>
+      <Label class="mb-2 block">Pollinations.ai API Key</Label>
+      <Input
+        type="password"
+        class="w-full"
+        value={settings.systemServicesSettings.imageGeneration
+          .pollinationsApiKey}
+        oninput={(e) => {
+          settings.systemServicesSettings.imageGeneration.pollinationsApiKey =
+            e.currentTarget.value;
+          settings.saveSystemServicesSettings();
+          loadPollinationsModels();
+        }}
+        placeholder="sk_..."
+      />
+      <p class="mt-1 text-xs text-muted-foreground">
+        Get your API key at <a
+          href="https://enter.pollinations.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary hover:underline">enter.pollinations.ai</a
+        >
+      </p>
+    </div>
+  {/if}
+
+  <!-- Image Model -->
+  {#if !settings.systemServicesSettings.imageGeneration.portraitMode}
+    <div>
+      <Label class="mb-2 block">Image Model</Label>
+      {#if settings.systemServicesSettings.imageGeneration.imageProvider === "pollinations"}
+        <ImageModelSelect
+          models={filteredPollinationsModels}
+          selectedModelId={settings.systemServicesSettings.imageGeneration
+            .model}
+          onModelChange={(id) => {
+            settings.systemServicesSettings.imageGeneration.model = id;
+            settings.saveSystemServicesSettings();
+          }}
+          showCost={true}
+          showImg2ImgIndicator={true}
+          showDescription={true}
+          isLoading={isLoadingPollinationsModels}
+          errorMessage={pollinationsModelsError}
+          showRefreshButton={true}
+          onRefresh={loadPollinationsModels}
+        />
+      {:else}
+        <Input
+          type="text"
+          class="w-full"
+          value={settings.systemServicesSettings.imageGeneration.model}
+          oninput={(e) => {
+            settings.systemServicesSettings.imageGeneration.model =
+              e.currentTarget.value;
+            settings.saveSystemServicesSettings();
+          }}
+          placeholder="z-image-turbo"
+        />
+      {/if}
+      <p class="mt-1 text-xs text-muted-foreground">
+        The image model to use for generation.
+      </p>
+    </div>
+  {/if}
+
+  <!-- Image Style -->
+  <div>
+    <Label class="mb-2 block">Image Style</Label>
+    <Select.Root
+      type="single"
+      value={settings.systemServicesSettings.imageGeneration.styleId}
+      onValueChange={(v) => {
+        settings.systemServicesSettings.imageGeneration.styleId = v;
+        settings.saveSystemServicesSettings();
+      }}
+    >
+      <Select.Trigger class="h-10 w-full">
+        {imageStyles.find(
+          (s) =>
+            s.value === settings.systemServicesSettings.imageGeneration.styleId,
+        )?.label ?? "Select style"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each imageStyles as style}
+          <Select.Item value={style.value} label={style.label}>
+            {style.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    <p class="mt-1 text-xs text-muted-foreground">
+      Visual style for generated images. Edit styles in the Prompts tab.
+    </p>
+  </div>
+
+  <!-- Image Size -->
+  <div>
+    <Label class="mb-2 block">Image Size</Label>
+    <Select.Root
+      type="single"
+      value={settings.systemServicesSettings.imageGeneration.size}
+      onValueChange={(v) => {
+        settings.systemServicesSettings.imageGeneration.size = v as
+          | "512x512"
+          | "1024x1024"
+          | "2048x2048";
+        settings.saveSystemServicesSettings();
+      }}
+    >
+      <Select.Trigger class="h-10 w-full">
+        {imageSizes.find(
+          (s) =>
+            s.value === settings.systemServicesSettings.imageGeneration.size,
+        )?.label ?? "Select size"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each imageSizes as size}
+          <Select.Item value={size.value} label={size.label}>
+            {size.label}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+  </div>
+
+  <!-- Max Images Per Message -->
+  <div>
+    <Label class="mb-2 block">
+      Max Images Per Message: {settings.systemServicesSettings.imageGeneration
+        .maxImagesPerMessage === 0
+        ? "Unlimited"
+        : settings.systemServicesSettings.imageGeneration.maxImagesPerMessage}
+    </Label>
+    <Slider
+      value={[
+        settings.systemServicesSettings.imageGeneration.maxImagesPerMessage,
+      ]}
+      onValueChange={(v) => {
+        settings.systemServicesSettings.imageGeneration.maxImagesPerMessage =
+          v[0];
+        settings.saveSystemServicesSettings();
+      }}
+      min={0}
+      max={5}
+      step={1}
+      class="w-full"
+    />
+    <p class="mt-1 text-xs text-muted-foreground">
+      Maximum images per narrative (0 = unlimited).
+    </p>
+  </div>
+
+  <!-- Portrait Reference Mode -->
+  <div class="flex items-center justify-between">
+    <div>
+      <Label>Portrait Reference Mode</Label>
+      <p class="text-xs text-muted-foreground">
+        Use character portraits as reference images when generating story
+        images.
+      </p>
+    </div>
+    <Switch
+      checked={settings.systemServicesSettings.imageGeneration.portraitMode}
+      onCheckedChange={(v) => {
+        settings.systemServicesSettings.imageGeneration.portraitMode = v;
+        settings.saveSystemServicesSettings();
+      }}
+    />
+  </div>
+
+  {#if settings.systemServicesSettings.imageGeneration.portraitMode}
+    <!-- Portrait Generation Model -->
+    <div>
+      <Label class="mb-2 block">Portrait Generation Model</Label>
+      {#if settings.systemServicesSettings.imageGeneration.imageProvider === "pollinations"}
+        <ImageModelSelect
+          models={filteredPollinationsModels}
+          selectedModelId={settings.systemServicesSettings.imageGeneration
+            .portraitModel}
+          onModelChange={(id) => {
+            settings.systemServicesSettings.imageGeneration.portraitModel = id;
+            settings.saveSystemServicesSettings();
+          }}
+          showCost={true}
+          showImg2ImgIndicator={true}
+          isLoading={isLoadingPollinationsModels}
+          errorMessage={pollinationsModelsError}
+          showRefreshButton={true}
+          onRefresh={loadPollinationsModels}
+        />
+      {:else}
+        <Input
+          type="text"
+          class="w-full"
+          value={settings.systemServicesSettings.imageGeneration.portraitModel}
+          oninput={(e) => {
+            settings.systemServicesSettings.imageGeneration.portraitModel =
+              e.currentTarget.value;
+            settings.saveSystemServicesSettings();
+          }}
+          placeholder="z-image-turbo"
+        />
+      {/if}
+      <p class="mt-1 text-xs text-muted-foreground">
+        Model used when generating character portraits from visual descriptors.
+      </p>
+    </div>
+
+    <!-- Reference Image Model -->
+    <div>
+      <Label class="mb-2 block">Reference Image Model</Label>
+      {#if settings.systemServicesSettings.imageGeneration.imageProvider === "pollinations"}
+        <ImageModelSelect
+          models={pollinationsImg2ImgModels}
+          selectedModelId={settings.systemServicesSettings.imageGeneration
+            .referenceModel}
+          onModelChange={(id) => {
+            settings.systemServicesSettings.imageGeneration.referenceModel = id;
+            settings.saveSystemServicesSettings();
+          }}
+          showCost={true}
+          showImg2ImgIndicator={false}
+          isLoading={isLoadingPollinationsModels}
+          errorMessage={pollinationsModelsError}
+          showRefreshButton={true}
+          onRefresh={loadPollinationsModels}
+        />
+      {:else}
+        <Input
+          type="text"
+          class="w-full"
+          value={settings.systemServicesSettings.imageGeneration.referenceModel}
+          oninput={(e) => {
+            settings.systemServicesSettings.imageGeneration.referenceModel =
+              e.currentTarget.value;
+            settings.saveSystemServicesSettings();
+          }}
+          placeholder="qwen-image"
+        />
+      {/if}
+      <p class="mt-1 text-xs text-muted-foreground">
+        Model used for story images when a character portrait is attached as
+        reference.
+      </p>
+    </div>
+  {/if}
+
+  <!-- Reset Button -->
+  <Button
+    variant="outline"
+    size="sm"
+    onclick={() => settings.resetImageGenerationSettings()}
+  >
+    <RotateCcw class="h-3 w-3 mr-1" />
+    Reset to Defaults
+  </Button>
+</div>

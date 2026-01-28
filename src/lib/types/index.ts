@@ -1,5 +1,4 @@
 // Core entity types for Aventura
-
 export type StoryMode = 'adventure' | 'creative-writing';
 export type POV = 'first' | 'second' | 'third';
 export type Tense = 'past' | 'present';
@@ -101,6 +100,7 @@ export interface StorySettings {
   themes?: string[];
   visualProseMode?: boolean;  // Enable HTML/CSS visual output mode
   inlineImageMode?: boolean;  // Enable <pic> tag inline image generation
+  imageGenerationMode?: 'none' | 'auto' | 'inline'; // Image generation strategy
 }
 
 export interface StoryEntry {
@@ -155,7 +155,6 @@ export interface Character {
 
 // ===== Character Vault Types =====
 
-export type VaultCharacterType = 'protagonist' | 'supporting';
 export type VaultCharacterSource = 'manual' | 'import' | 'story';
 
 /**
@@ -166,17 +165,6 @@ export interface VaultCharacter {
   id: string;
   name: string;
   description: string | null;
-
-  // Type determines which fields are relevant
-  characterType: VaultCharacterType;
-
-  // Protagonist-specific fields
-  background: string | null;   // Backstory for protagonist wizard step
-  motivation: string | null;   // Goals/drives for protagonist wizard step
-
-  // Supporting-specific fields
-  role: string | null;         // e.g., "Mentor", "Rival", "Love Interest"
-  relationshipTemplate: string | null;  // Default relationship when added
 
   // Common fields (same as Character)
   traits: string[];
@@ -665,7 +653,8 @@ export interface APISettings {
 
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
 
-export type ThemeId = 'dark' | 'light' | 'light-solarized' | 'retro-console' | 'fallen-down';
+import type { ThemeId as ThemeIdImport } from '../../themes/themes';
+export type ThemeId = ThemeIdImport;
 
 export type FontSource = 'default' | 'system' | 'google';
 
@@ -734,7 +723,7 @@ export interface InlineImageTag {
   status: 'pending' | 'generating' | 'complete' | 'failed';
 }
 
-export type ImageSize = '512x512' | '1024x1024';
+export type ImageSize = '512x512' | '1024x1024' | '2048x2048';
 
 export interface ImageGenerationSettings {
   enabled: boolean;               // Toggle for image generation (default: false)

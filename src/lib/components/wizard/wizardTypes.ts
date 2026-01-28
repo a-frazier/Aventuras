@@ -10,7 +10,7 @@ import type {
   GeneratedCharacter,
   GeneratedOpening,
   Tense,
-} from "$lib/services/ai/scenario";
+} from "$lib/services/ai/wizard/ScenarioService";
 import type {
   LorebookImportResult,
   ImportedEntry,
@@ -27,6 +27,7 @@ export type { StoryMode, POV, EntryType };
  */
 export interface ImportedLorebookItem {
   id: string;
+  vaultId?: string; // If imported from vault
   filename: string;
   result: LorebookImportResult;
   entries: ImportedEntry[];

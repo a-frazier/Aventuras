@@ -7,20 +7,15 @@
  */
 
 import type { StoryMode } from '$lib/types';
-import type { Genre, GeneratedCharacter } from '$lib/services/ai/scenario';
-import { OpenAIProvider } from './ai/openrouter';
+import type { Genre, GeneratedCharacter } from '$lib/services/ai/wizard/ScenarioService';
+import { OpenAIProvider } from './ai/core/OpenAIProvider';
 import { settings } from '$lib/stores/settings.svelte';
-import { buildExtraBody } from '$lib/services/ai/requestOverrides';
+import { buildExtraBody } from '$lib/services/ai/core/requestOverrides';
 import { promptService, type PromptContext } from './prompts';
-import { tryParseJsonWithHealing } from './ai/jsonHealing';
+import { tryParseJsonWithHealing } from './ai/utils/jsonHealing';
+import { createLogger } from './ai/core/config';
 
-const DEBUG = true;
-
-function log(...args: any[]) {
-  if (DEBUG) {
-    console.log('[CharacterCardImporter]', ...args);
-  }
-}
+const log = createLogger('CharacterCardImporter');
 
 // ===== PNG Metadata Extraction =====
 
@@ -533,9 +528,6 @@ export async function convertCardToScenario(
 export interface SanitizedCharacter {
   name: string;
   description: string;
-  background: string | null;
-  motivation: string | null;
-  role: string | null;
   traits: string[];
   visualDescriptors: string[];
 }
@@ -612,9 +604,6 @@ export async function sanitizeCharacterCard(
     interface VaultImportResult {
       name: string;
       description: string;
-      background: string | null;
-      motivation: string | null;
-      role: string | null;
       traits: string[];
       visualDescriptors: string[];
     }
@@ -628,9 +617,6 @@ export async function sanitizeCharacterCard(
     return {
       name: result.name || card.name,
       description: result.description || '',
-      background: result.background || null,
-      motivation: result.motivation || null,
-      role: result.role || null,
       traits: Array.isArray(result.traits) ? result.traits.slice(0, 10) : [],
       visualDescriptors: Array.isArray(result.visualDescriptors) ? result.visualDescriptors : [],
     };
