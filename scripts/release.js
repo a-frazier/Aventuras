@@ -32,7 +32,7 @@ function bumpVersion(version, type) {
 
 const inputArg = process.argv[2]
 const newVersion = bumpVersion(currentVersion, inputArg)
-const REMOTE = 'https://github.com/AventurasTeam/Aventuras.git'
+const REMOTE = 'origin'
 
 // Files to update manually
 const manualFiles = [
